@@ -1,18 +1,20 @@
 /* RecoveryCORE Service Worker — offline shell + runtime caching.
    Supabase API calls are never cached (always live). */
-const VERSION = 'rcore-v3';
+const VERSION = 'rcore-v4';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
+const BASE_PATH = self.location.pathname.replace(/\/sw\.js$/, '') || '';
+
 const PRECACHE = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  '/icons/icon-96.png',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/maskable-512.png',
-  '/icons/apple-touch-icon.png',
+  `${BASE_PATH}/`,
+  `${BASE_PATH}/index.html`,
+  `${BASE_PATH}/manifest.webmanifest`,
+  `${BASE_PATH}/icons/icon-96.png`,
+  `${BASE_PATH}/icons/icon-192.png`,
+  `${BASE_PATH}/icons/icon-512.png`,
+  `${BASE_PATH}/icons/maskable-512.png`,
+  `${BASE_PATH}/icons/apple-touch-icon.png`,
 ];
 
 self.addEventListener('install', (event) => {
@@ -66,10 +68,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          caches.open(SHELL_CACHE).then((cache) => cache.put('/index.html', res.clone()));
+          caches.open(SHELL_CACHE).then((cache) => cache.put(`${BASE_PATH}/index.html`, res.clone()));
           return res;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match(`${BASE_PATH}/index.html`))
     );
     return;
   }
