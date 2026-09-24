@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 vendor/
 .env
 .env.local
@@ -6,3 +6,5 @@ vendor/
 *.local
 .vscode/
 .idea/
+dist/
+isolate/
