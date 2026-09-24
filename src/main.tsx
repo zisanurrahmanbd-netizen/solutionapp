@@ -76,5 +76,21 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register('./sw.js').catch((err) => {
       console.warn('Service worker registration failed:', err);
     });
+
+    // Activate any waiting service worker immediately instead of waiting
+    // for every tab to close.
+    navigator.serviceWorker.ready.then((reg) => {
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        reg.waiting.postMessage('SKIP_WAITING');
+      }
+    });
+
+    // When a new service worker takes control, reload once so the page
+    // runs the latest bundle instead of a stale cached shell.
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (sessionStorage.getItem('sw:autoReload') === '1') return;
+      sessionStorage.setItem('sw:autoReload', '1');
+      window.location.reload();
+    });
   });
 }

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dataService } from '../services/dataService';
+import { exportTableToExcel, exportTableToPdf } from '../services/exportService';
 import { Collection, CaseFile } from '../types';
 import { 
   DollarSign, 
@@ -10,7 +11,9 @@ import {
   Trash2, 
   Search, 
   Camera, 
-  ChevronRight
+  ChevronRight,
+  FileDown,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface TotalCashCollectedProps {
@@ -129,6 +132,50 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
     }
   };
 
+  // ── Export: rows matching the visible table, respecting current search + status filter ──
+  const buildExportRows = (): (string | number)[][] =>
+    filtered.map(c => {
+      const cItem = caseMap.get(c.case_file_id);
+      const st = (c.status || 'pending').charAt(0).toUpperCase() + (c.status || 'pending').slice(1);
+      return [
+        cItem?.file_number || `#${c.case_file_id}`,
+        cItem?.customer_name || 'Unknown',
+        cItem?.bank?.name || '',
+        Number(c.amount) || 0,
+        (c.payment_method || '').replace('_', ' '),
+        c.receipt_number ? `#${c.receipt_number}` : '',
+        c.collected_at ? new Date(c.collected_at).toLocaleDateString() : '',
+        c.agent?.name || 'Assigned Agent',
+        c.photo_url ? 'Yes' : 'No',
+        st,
+        c.verified_by || '',
+        c.rejection_reason || '',
+      ];
+    });
+
+  const EXPORT_HEADERS = [
+    'File #', 'Customer', 'Bank', 'Amount (BDT)', 'Payment Method', 'Receipt #',
+    'Collected Date', 'Agent', 'Proof Photo', 'Status', 'Verified By', 'Rejection Reason',
+  ];
+
+  const handleExportExcel = () => {
+    exportTableToExcel(
+      `Total_Cash_Collected_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      'Cash Collections',
+      EXPORT_HEADERS,
+      buildExportRows()
+    );
+  };
+
+  const handleExportPdf = () => {
+    exportTableToPdf(
+      `Total_Cash_Collected_${new Date().toISOString().slice(0, 10)}.pdf`,
+      'Total Cash Collected & Verifications Report',
+      EXPORT_HEADERS,
+      buildExportRows()
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -141,6 +188,25 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Review, approve, or reject field recovery collections and sync status to assigned agents
           </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleExportPdf}
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
+            title="Export current view as PDF report"
+          >
+            <FileDown className="w-4 h-4" />
+            <span>Export PDF</span>
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-emerald-600/30"
+            title="Export current view as Excel spreadsheet"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Export Excel</span>
+          </button>
         </div>
       </div>
 
