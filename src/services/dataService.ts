@@ -616,6 +616,10 @@ class DataService {
       if (Array.isArray(data) && data.length > 0) {
         this.collections = data.map((col: any) => ({
           ...col,
+          // Coerce ids to numbers so case-map lookups (string/number) never miss.
+          id: Number(col.id),
+          case_file_id: Number(col.case_file_id || col.case_id || 0),
+          agent_id: Number(col.agent_id || 0),
           // Preserve verification state — without this, approved/rejected
           // payments flip back to "pending" on every sync/refresh.
           status: col.status || undefined,
@@ -1369,8 +1373,9 @@ class DataService {
     return list.map(c => enrichCase(c));
   }
 
-  public getCaseById(id: number): CaseFile | undefined {
-    const item = this.cases.find(c => c.id === id);
+  public getCaseById(id: number | string): CaseFile | undefined {
+    const target = Number(id);
+    const item = this.cases.find(c => Number(c.id) === target || String(c.id) === String(id));
     if (!item) return undefined;
     return enrichCase(item);
   }

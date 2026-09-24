@@ -45,12 +45,21 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
   }, [user, refreshKey]);
 
   const caseMap = useMemo(() => {
-    const map = new Map<number, CaseFile>();
+    // Keys are stringified so lookups never miss on string vs number ids
+    // (e.g. ids arriving from Supabase as strings or from Date.now()).
+    const map = new Map<string, CaseFile>();
     // For admin, load all cases so every collection file matches
     const casesToMap = user?.role === 'admin' ? dataService.getCases({ role: 'admin' } as any) : allCases;
-    casesToMap.forEach(c => map.set(c.id, c));
+    casesToMap.forEach(c => map.set(String(c.id), c));
     return map;
   }, [allCases, user]);
+
+  // Shared lookup: map first, then the collection's embedded case_file, then
+  // a direct dataService fetch (covers cases not in the permission-filtered list).
+  const resolveCase = (c: Collection): CaseFile | undefined =>
+    caseMap.get(String(c.case_file_id))
+    || (c.case_file as CaseFile | undefined)
+    || dataService.getCaseById(c.case_file_id);
 
   // Calculations
   const stats = useMemo(() => {
@@ -96,11 +105,11 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
 
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
-        const cItem = caseMap.get(c.case_file_id);
+        const cItem = resolveCase(c);
         const matchFile = cItem?.file_number.toLowerCase().includes(q);
         const matchCust = cItem?.customer_name.toLowerCase().includes(q);
         const matchRec = c.receipt_number?.toLowerCase().includes(q);
-        const matchAgent = c.agent?.name?.toLowerCase().includes(q);
+        const matchAgent = c.agent?.name?.toLowerCase().includes(q) || cItem?.agent_name?.toLowerCase().includes(q);
         if (!matchFile && !matchCust && !matchRec && !matchAgent) return false;
       }
 
@@ -135,17 +144,18 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
   // ── Export: rows matching the visible table, respecting current search + status filter ──
   const buildExportRows = (): (string | number)[][] =>
     filtered.map(c => {
-      const cItem = caseMap.get(c.case_file_id);
-      const st = (c.status || 'pending').charAt(0).toUpperCase() + (c.status || 'pending').slice(1);
+      const cItem = resolveCase(c);
+      const rawSt = c.status || 'pending';
+      const st = rawSt.charAt(0).toUpperCase() + rawSt.slice(1);
       return [
-        cItem?.file_number || `#${c.case_file_id}`,
+        cItem?.file_number || `Case #${c.case_file_id}`,
         cItem?.customer_name || 'Unknown',
-        cItem?.bank?.name || '',
+        cItem?.bank?.name || cItem?.bank_name || '',
         Number(c.amount) || 0,
         (c.payment_method || '').replace('_', ' '),
         c.receipt_number ? `#${c.receipt_number}` : '',
         c.collected_at ? new Date(c.collected_at).toLocaleDateString() : '',
-        c.agent?.name || 'Assigned Agent',
+        c.agent?.name || cItem?.agent_name || 'Assigned Agent',
         c.photo_url ? 'Yes' : 'No',
         st,
         c.verified_by || '',
@@ -323,7 +333,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
                 </tr>
               )}
               {filtered.map(c => {
-                const cItem = caseMap.get(c.case_file_id);
+                const cItem = resolveCase(c);
                 const st = c.status || 'pending';
 
                 return (
