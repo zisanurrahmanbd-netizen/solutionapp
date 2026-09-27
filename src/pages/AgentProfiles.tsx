@@ -71,8 +71,16 @@ interface AgentStats {
   ptpMissed: number;
   ptpReissued: number;
   ptpSuccessful: number;
-  /** bank_name → file count (for the bank breakdown like the portfolio widget) */
-  banks: { name: string; count: number }[];
+  /** Bank–Product portfolio sections (One Bank – Loan, DBBL – Credit Card…) */
+  portfolios: {
+    label: string;
+    count: number;
+    visited: number;
+    notVisited: number;
+    updated: number;
+    notUpdated: number;
+    collected: number;
+  }[];
 }
 
 const AgentProfilesPage: React.FC = () => {
@@ -173,12 +181,43 @@ const AgentProfilesPage: React.FC = () => {
         });
         ptpReissued = casesWithMultiPtp.size;
 
-        // Bank-wise file distribution (like the portfolio summary widget)
-        const bankMap = new Map<string, number>();
+        // Bank–Product portfolio sections (e.g. "One Bank – Loan",
+        // "DBBL – Credit Card", "Asian Paints – Dealers")
+        const groupMap = new Map<string, { label: string; cases: CaseFile[] }>();
         agentCases.forEach(c => {
-          const bankName = c.bank?.name || c.bank_name || 'Unassigned Bank';
-          bankMap.set(bankName, (bankMap.get(bankName) || 0) + 1);
+          const bank = c.bank?.name || c.bank_name || 'Unassigned Bank';
+          const product =
+            c.product_name ||
+            c.product?.name ||
+            c.extra_attributes?.PRODUCT_NAME ||
+            c.extra_attributes?.FILE_TYPE ||
+            'General';
+          const key = `${bank}||${product}`;
+          if (!groupMap.has(key)) groupMap.set(key, { label: `${bank} – ${product}`, cases: [] });
+          groupMap.get(key)!.cases.push(c);
         });
+
+        const portfolios = [...groupMap.values()]
+          .map(({ label, cases }) => {
+            const caseIds = new Set(cases.map(c => c.id));
+            const visited = cases.filter(
+              c => visitedCaseIds.has(c.id)
+            ).length;
+            const updated = cases.filter(c => remarkedCaseIds.has(c.id)).length;
+            const collected = agentCollections
+              .filter(col => isApproved(col) && caseIds.has(col.case_file_id))
+              .reduce((sum, col) => sum + (Number(col.amount) || 0), 0);
+            return {
+              label,
+              count: cases.length,
+              visited,
+              notVisited: cases.length - visited,
+              updated,
+              notUpdated: cases.length - updated,
+              collected,
+            };
+          })
+          .sort((a, b) => b.count - a.count);
 
         const monthCollected = agentCollections
           .filter(c => collectionMonth(c) === currentMonth && isApproved(c))
@@ -202,9 +241,7 @@ const AgentProfilesPage: React.FC = () => {
           ptpMissed,
           ptpReissued,
           ptpSuccessful,
-          banks: [...bankMap.entries()]
-            .map(([name, count]) => ({ name, count }))
-            .sort((a, b) => b.count - a.count),
+          portfolios,
         };
       })
       .sort((a, b) => b.monthCollected - a.monthCollected);
@@ -380,24 +417,51 @@ const AgentProfilesPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Bank-wise files */}
-                  {s.banks.length > 0 && (
+                  {/* Bank–Product portfolio sections */}
+                  {s.portfolios.length > 0 && (
                     <div>
-                      <h4 className="text-[11px] uppercase font-bold text-slate-400 mb-2">Files by Bank</h4>
-                      <div className="space-y-1.5">
-                        {s.banks.slice(0, 6).map(b => (
-                          <div key={b.name} className="flex items-center gap-2.5 text-xs">
-                            <Landmark className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="font-bold text-slate-700 dark:text-slate-200 w-40 truncate">{b.name}</span>
-                            <div className="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-slate-400 dark:bg-slate-500"
-                                style={{ width: `${Math.max(4, (b.count / s.totalFiles) * 100)}%` }}
-                              />
+                      <h4 className="text-[11px] uppercase font-bold text-slate-400 mb-2">Portfolio by Bank & Product</h4>
+                      <div className="space-y-2">
+                        {s.portfolios.map(p => {
+                          const max = s.portfolios[0].count || 1;
+                          return (
+                            <div key={p.label} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
+                              <div className="flex items-center gap-2.5">
+                                <Landmark className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="font-bold text-slate-700 dark:text-slate-200 text-xs flex-1 truncate">{p.label}</span>
+                                <span className="font-mono font-black text-slate-800 dark:text-slate-100 text-xs">{p.count} files</span>
+                              </div>
+                              <div className="mt-1.5 h-1.5 rounded-full bg-slate-200/60 dark:bg-slate-800 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-slate-400 dark:bg-slate-500"
+                                  style={{ width: `${Math.max(4, (p.count / max) * 100)}%` }}
+                                />
+                              </div>
+                              <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
+                                <div className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
+                                  <div className="text-[9px] font-bold text-slate-400 uppercase">Visited</div>
+                                  <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">{p.visited}</div>
+                                  <div className="text-[9px] text-slate-400">{p.notVisited} left</div>
+                                </div>
+                                <div className="p-1.5 rounded-lg bg-blue-500/5 border border-blue-500/15">
+                                  <div className="text-[9px] font-bold text-slate-400 uppercase">Updated</div>
+                                  <div className="text-xs font-black text-blue-600 dark:text-blue-400">{p.updated}</div>
+                                  <div className="text-[9px] text-slate-400">{p.notUpdated} left</div>
+                                </div>
+                                <div className="p-1.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                                  <div className="text-[9px] font-bold text-slate-400 uppercase">Not Visited</div>
+                                  <div className="text-xs font-black text-amber-600 dark:text-amber-400">{p.notVisited}</div>
+                                  <div className="text-[9px] text-slate-400">of {p.count}</div>
+                                </div>
+                                <div className="p-1.5 rounded-lg bg-rose-500/5 border border-rose-500/15">
+                                  <div className="text-[9px] font-bold text-slate-400 uppercase">Collected</div>
+                                  <div className="text-xs font-black text-rose-600 dark:text-rose-400 font-mono">{fmtMoney(p.collected)}</div>
+                                  <div className="text-[9px] text-slate-400">BDT total</div>
+                                </div>
+                              </div>
                             </div>
-                            <span className="font-mono font-bold text-slate-500 w-10 text-right">{b.count}</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
