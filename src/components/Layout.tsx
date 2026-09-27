@@ -36,6 +36,12 @@ export const Layout: React.FC<LayoutProps> = ({ currentPage, onNavigate, onSearc
       />
 
       <div className={`flex-1 ${isCollapsed ? 'lg:pl-20' : 'lg:pl-64'} flex flex-col min-w-0 max-w-full overflow-x-hidden transition-[padding] duration-300`}>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:z-[200] focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-xl focus:bg-slate-900 focus:text-white focus:font-bold focus:text-xs focus:shadow-lg"
+        >
+          Skip to main content
+        </a>
         <OfflineBanner />
         <Navbar
           onSearch={onSearch}
@@ -43,7 +49,7 @@ export const Layout: React.FC<LayoutProps> = ({ currentPage, onNavigate, onSearc
           isCollapsed={isCollapsed}
           onToggleCollapse={handleToggleCollapse}
         />
-        <main className="flex-1 p-3 sm:p-5 md:p-7 w-full max-w-[1700px] mx-auto min-w-0">
+        <main id="main-content" className="flex-1 p-3 sm:p-5 md:p-7 w-full max-w-[1700px] mx-auto min-w-0">
           {children}
         </main>
       </div>

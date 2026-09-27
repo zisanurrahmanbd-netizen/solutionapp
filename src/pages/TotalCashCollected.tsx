@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dataService } from '../services/dataService';
 import { exportTableToExcel, exportTableToPdf } from '../services/exportService';
+import { AccessibleModal } from '../components/AccessibleModal';
 import { Collection, CaseFile } from '../types';
 import { 
   DollarSign, 
@@ -35,6 +36,36 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const bulkDeleteRef = useRef<HTMLButtonElement>(null);
+
+  // Screen-reader announcement region.
+  useEffect(() => {
+    if (!announcement) return;
+    const t = setTimeout(() => setAnnouncement(''), 5000);
+    return () => clearTimeout(t);
+  }, [announcement]);
+
+  // Set indeterminate state on the select-all checkbox.
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selectedIds.size > 0 && !allVisibleSelected;
+    }
+  });
+
+  // Move focus to the bulk-delete button when it appears.
+  useEffect(() => {
+    if (selectedIds.size > 0 && !deleting) bulkDeleteRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds.size === 0]);
+
+  // Announce selection count changes.
+  useEffect(() => {
+    if (selectedIds.size > 0) {
+      setAnnouncement(`${selectedIds.size} record${selectedIds.size === 1 ? '' : 's'} selected`);
+    }
+  }, [selectedIds.size]);
 
   const collections = useMemo(() => {
     const all = dataService.getAllCollections();
@@ -123,6 +154,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
 
   const handleApprove = (id: number) => {
     dataService.verifyCollection(id, 'approved', undefined, user?.name || 'Admin');
+    setAnnouncement('Payment approved.');
     setRefreshKey(k => k + 1);
   };
 
@@ -135,6 +167,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
     if (!rejectingCol) return;
     dataService.verifyCollection(rejectingCol.id, 'rejected', rejectionReason, user?.name || 'Admin');
     setRejectingCol(null);
+    setAnnouncement('Payment rejected. The assigned agent will see the reason.');
     setRefreshKey(k => k + 1);
   };
 
@@ -176,6 +209,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
     try {
       selectedIds.forEach(id => dataService.deleteCollection(id));
       setSelectedIds(new Set());
+      setAnnouncement(`${selectedIds.size} payment record(s) permanently deleted.`);
       setRefreshKey(k => k + 1);
     } finally {
       setDeleting(false);
@@ -216,6 +250,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
       EXPORT_HEADERS,
       buildExportRows()
     );
+    setAnnouncement(`Excel export started: ${filtered.length} records.`);
   };
 
   const handleExportPdf = () => {
@@ -225,6 +260,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
       EXPORT_HEADERS,
       buildExportRows()
     );
+    setAnnouncement(`PDF export started: ${filtered.length} records.`);
   };
 
   return (
@@ -244,18 +280,18 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={handleExportPdf}
-            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
-            title="Export current view as PDF report"
+            className="px-3.5 py-2 min-h-[36px] rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+            aria-label={`Export ${filtered.length} currently filtered records as a PDF report`}
           >
-            <FileDown className="w-4 h-4" />
+            <FileDown className="w-4 h-4" aria-hidden="true" />
             <span>Export PDF</span>
           </button>
           <button
             onClick={handleExportExcel}
-            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-emerald-600/30"
-            title="Export current view as Excel spreadsheet"
+            className="px-3.5 py-2 min-h-[36px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-emerald-600/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2"
+            aria-label={`Export ${filtered.length} currently filtered records as an Excel spreadsheet`}
           >
-            <FileSpreadsheet className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4" aria-hidden="true" />
             <span>Export Excel</span>
           </button>
         </div>
@@ -273,7 +309,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
           <div className="text-xl font-black text-slate-900 dark:text-white mt-2 font-mono">
             BDT {stats.totalCollected.toLocaleString()}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">{stats.totalCount} payment entries</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{stats.totalCount} payment entries</div>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm">
@@ -286,7 +322,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
           <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono">
             BDT {stats.approvedAmount.toLocaleString()}
           </div>
-          <div className="text-[11px] text-emerald-600/70 mt-0.5">{stats.approvedCount} approved files</div>
+          <div className="text-[11px] text-emerald-600 dark:text-emerald-400/80 mt-0.5">{stats.approvedCount} approved files</div>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-500/30 bg-amber-50/20 dark:bg-amber-950/10 shadow-sm">
@@ -299,7 +335,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
           <div className="text-xl font-black text-amber-600 dark:text-amber-400 mt-2 font-mono">
             BDT {stats.pendingAmount.toLocaleString()}
           </div>
-          <div className="text-[11px] text-amber-600/70 mt-0.5">{stats.pendingCount} awaiting approval</div>
+          <div className="text-[11px] text-amber-600 dark:text-amber-400/80 mt-0.5">{stats.pendingCount} awaiting approval</div>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-rose-500/30 bg-rose-50/20 dark:bg-rose-950/10 shadow-sm">
@@ -312,7 +348,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
           <div className="text-xl font-black text-rose-600 dark:text-rose-400 mt-2 font-mono">
             BDT {stats.rejectedAmount.toLocaleString()}
           </div>
-          <div className="text-[11px] text-rose-600/70 mt-0.5">{stats.rejectedCount} payments rejected</div>
+          <div className="text-[11px] text-rose-600 dark:text-rose-400/80 mt-0.5">{stats.rejectedCount} payments rejected</div>
         </div>
       </div>
 
@@ -320,13 +356,14 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
       <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2 flex-1 min-w-[240px]">
           <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
             <input
               type="text"
               placeholder="Search by file #, customer name, receipt #, agent..."
+              aria-label="Search payments by file number, customer name, receipt number, or agent"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
             />
           </div>
         </div>
@@ -336,10 +373,11 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
             <button
               key={st}
               onClick={() => setFilterStatus(st)}
-              className={`px-3 py-1.5 rounded-xl font-bold capitalize transition-all ${
+              aria-pressed={filterStatus === st}
+              className={`px-3 py-2 min-h-[36px] rounded-xl font-bold capitalize transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                 filterStatus === st
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
               }`}
             >
               {st} {st === 'pending' && stats.pendingCount > 0 && `(${stats.pendingCount})`}
@@ -348,12 +386,12 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
 
           {selectedIds.size > 0 && (
             <button
+              ref={bulkDeleteRef}
               onClick={handleBulkDelete}
               disabled={deleting}
-              className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-rose-600/30 ml-1"
-              title="Delete all selected payment records"
+              className="px-3 py-2 min-h-[36px] rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-rose-600/30 ml-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
               <span>{deleting ? 'Deleting…' : `Delete Selected (${selectedIds.size})`}</span>
             </button>
           )}
@@ -364,31 +402,34 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
       <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[850px]">
-            <thead className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[11px] font-bold">
+            <caption className="sr-only">
+              Payment collections with amount, agent, verification status, and actions. Select rows to delete in bulk.
+            </caption>
+            <thead className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase text-[11px] font-bold">
               <tr>
-                <th className="py-3 px-4 w-10">
+                <th scope="col" className="py-3 px-4 w-10">
                   <input
+                    ref={selectAllRef}
                     type="checkbox"
                     checked={allVisibleSelected}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded cursor-pointer accent-rose-600"
-                    title="Select / deselect all visible rows"
+                    aria-label="Select or deselect all visible rows"
+                    className="w-6 h-6 rounded cursor-pointer accent-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                   />
                 </th>
-                <th className="py-3 px-4">File & Customer</th>
-                <th className="py-3 px-4">Amount</th>
-                <th className="py-3 px-4">Payment Method / Receipt</th>
-                <th className="py-3 px-4">Collected Date</th>
-                <th className="py-3 px-4">Agent</th>
-                <th className="py-3 px-4">Proof Photo</th>
-                <th className="py-3 px-4">Verification Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th scope="col" className="py-3 px-4">File & Customer</th>
+                <th scope="col" className="py-3 px-4">Amount</th>
+                <th scope="col" className="py-3 px-4">Payment Method / Receipt</th>
+                <th scope="col" className="py-3 px-4">Collected Date</th>
+                <th scope="col" className="py-3 px-4">Agent</th>
+                <th scope="col" className="py-3 px-4">Proof Photo</th>
+                <th scope="col" className="py-3 px-4">Verification Status</th>
+                <th scope="col" className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+              {filtered.length === 0 && (                  <tr>
+                  <td colSpan={9} className="py-12 text-center text-slate-500 dark:text-slate-400">
                     <p className="font-semibold text-sm">No payment records found</p>
                     <p className="text-xs mt-1">Payments recorded on case files will appear here for verification</p>
                   </td>
@@ -409,15 +450,16 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
                         type="checkbox"
                         checked={selectedIds.has(c.id)}
                         onChange={() => toggleSelect(c.id)}
-                        className="w-4 h-4 rounded cursor-pointer accent-rose-600"
-                        title="Select this record"
+                        aria-label={`Select payment record for ${cItem ? `${cItem.customer_name}, file ${cItem.file_number}` : `case ${c.case_file_id}`}`}
+                        className="w-6 h-6 rounded cursor-pointer accent-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                       />
                     </td>
                     <td className="py-3.5 px-4">
                       {cItem ? (
                         <button
                           onClick={() => onSelectCase?.(cItem.id)}
-                          className="text-left group"
+                          className="text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-lg"
+                          aria-label={`Open case ${cItem.file_number} for ${cItem.customer_name}`}
                         >
                           <div className="font-mono font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 flex items-center gap-1">
                             {cItem.file_number}
@@ -456,7 +498,8 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
                       {c.photo_url ? (
                         <button
                           onClick={() => setSelectedPhoto(c.photo_url!)}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold transition-all border border-emerald-500/30"
+                          className="flex items-center gap-1 px-2.5 py-2 min-h-[36px] rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold transition-all border border-emerald-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                          aria-label={`View proof photo for ${cItem ? cItem.customer_name : 'this payment'}`}
                         >
                           <Camera className="w-3.5 h-3.5" />
                           <span>View Photo</span>
@@ -503,29 +546,29 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
                             {st !== 'approved' && (
                               <button
                                 onClick={() => handleApprove(c.id)}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 transition-all shadow-sm"
-                                title="Approve and confirm collection"
+                                className="px-2.5 py-2 min-h-[36px] rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 transition-all shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
+                                aria-label={`Approve payment of BDT ${Number(c.amount).toLocaleString()} for ${cItem ? cItem.customer_name : 'this case'}`}
                               >
-                                <CheckCircle2 className="w-3 h-3" /> Approve
+                                <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Approve
                               </button>
                             )}
                             {st !== 'rejected' && (
                               <button
                                 onClick={() => handleOpenRejectModal(c)}
-                                className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-[11px] flex items-center gap-1 transition-all border border-rose-500/30"
-                                title="Reject payment with reason note"
+                                className="px-2.5 py-2 min-h-[36px] rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-[11px] flex items-center gap-1 transition-all border border-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+                                aria-label={`Reject payment for ${cItem ? cItem.customer_name : 'this case'} with a reason note`}
                               >
-                                <XCircle className="w-3 h-3" /> Reject
+                                <XCircle className="w-3 h-3" aria-hidden="true" /> Reject
                               </button>
                             )}
                           </>
                         )}
                         <button
                           onClick={() => handleDelete(c.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all"
-                          title="Delete collection permanently"
+                          className="p-2.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+                          aria-label={`Permanently delete payment record for ${cItem ? cItem.customer_name : `case ${c.case_file_id}`}`}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       </div>
                     </td>
@@ -537,44 +580,58 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
         </div>
       </div>
 
+      {/* Screen-reader announcement region */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
+
       {/* Photo Preview Modal */}
       {selectedPhoto && (
-        <div 
-          onClick={() => setSelectedPhoto(null)}
-          className="fixed inset-0 z-[100] w-screen h-screen flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+        <AccessibleModal
+          title="Payment Receipt Proof"
+          onClose={() => setSelectedPhoto(null)}
+          panelClassName="max-w-lg"
+          titleIcon={<Camera className="w-4 h-4 text-emerald-500" aria-hidden="true" />}
         >
-          <div onClick={e => e.stopPropagation()} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-3xl max-w-lg w-full space-y-3 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
-                <Camera className="w-4 h-4 text-emerald-500" /> Payment Receipt Proof
-              </h4>
-              <button onClick={() => setSelectedPhoto(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white font-bold text-base">✕</button>
-            </div>
-            <img src={selectedPhoto} alt="Payment Receipt" className="rounded-2xl max-h-[70vh] w-full object-contain border border-slate-100 dark:border-slate-800" />
-            <div className="flex justify-end">
-              <button onClick={() => setSelectedPhoto(null)} className="px-4 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-xs">Close</button>
-            </div>
+          <img
+            src={selectedPhoto}
+            alt="Payment receipt proof photo"
+            className="rounded-2xl max-h-[70vh] w-full object-contain border border-slate-100 dark:border-slate-800"
+          />
+          <div className="flex justify-end mt-3">
+            <button
+              onClick={() => setSelectedPhoto(null)}
+              className="px-4 py-2 min-h-[36px] rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            >
+              Close
+            </button>
           </div>
-        </div>
+        </AccessibleModal>
       )}
 
       {/* Reject Payment with Reason Modal */}
       {rejectingCol && (
-        <div className="fixed inset-0 z-[100] w-screen h-screen flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl max-w-sm w-full space-y-3 shadow-2xl text-xs">
-            <h4 className="font-bold text-sm text-rose-600 flex items-center gap-1.5">
-              <XCircle className="w-4 h-4" /> Reject Payment Record
-            </h4>
+        <AccessibleModal
+          title="Reject Payment Record"
+          onClose={() => setRejectingCol(null)}
+          panelClassName="max-w-sm"
+          titleClassName="font-bold text-sm text-rose-600"
+          titleIcon={<XCircle className="w-4 h-4" aria-hidden="true" />}
+        >
+          <div className="space-y-3 text-xs">
             <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
               Specify the reason why this collection of <b>BDT {rejectingCol.amount.toLocaleString()}</b> is being rejected. The assigned agent will see this note.
             </p>
 
             <div className="space-y-1.5">
-              <label className="block font-bold text-slate-600 dark:text-slate-300">Rejection Reason</label>
+              <label htmlFor="rejection-reason" className="block font-bold text-slate-600 dark:text-slate-300">
+                Rejection Reason
+              </label>
               <select
+                id="rejection-reason"
                 value={rejectionReason}
                 onChange={e => setRejectionReason(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
               >
                 <option value="Amount was not right / Does not match bank deposit">Amount was not right / Does not match deposit</option>
                 <option value="Customer did not actually pay / Fake slip">Customer did not pay / Fake receipt slip</option>
@@ -588,19 +645,19 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setRejectingCol(null)}
-                className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-slate-600 dark:text-slate-300"
+                className="px-3.5 py-2 min-h-[36px] rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-slate-600 dark:text-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmReject}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-md shadow-rose-600/30"
+                className="px-4 py-2 min-h-[36px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-md shadow-rose-600/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2"
               >
                 Confirm Reject
               </button>
             </div>
           </div>
-        </div>
+        </AccessibleModal>
       )}
     </div>
   );

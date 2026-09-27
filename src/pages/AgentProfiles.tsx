@@ -291,16 +291,17 @@ const AgentProfilesPage: React.FC = () => {
       {/* Search */}
       <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-2">
         <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
           <input
             type="text"
             placeholder="Search agent by name or employee ID..."
+            aria-label="Search agents by name or employee ID"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
           />
         </div>
-        <span className="ml-auto text-[11px] text-slate-400 font-bold">{filtered.length} agent(s)</span>
+        <span className="ml-auto text-[11px] text-slate-500 dark:text-slate-400 font-bold" aria-live="polite">{filtered.length} agent(s)</span>
       </div>
 
       {/* Agent profile cards */}
@@ -323,26 +324,29 @@ const AgentProfilesPage: React.FC = () => {
               {/* Card header — always visible */}
               <button
                 onClick={() => setExpandedId(expanded ? null : s.id)}
-                className="w-full text-left p-5"
+                aria-expanded={expanded}
+                aria-controls={`agent-panel-${s.id}`}
+                className="w-full text-left p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-inset"
+                aria-label={`${s.name} performance profile: ${s.totalFiles} files, ${s.monthlyTarget > 0 ? `${Math.round(pct)} percent of monthly target` : 'no monthly target set'}, ${s.visitedFiles} visited, ${s.ptpMissed} promises missed. Click to ${expanded ? 'collapse' : 'expand'} details.`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-base shrink-0">
                       {s.name.charAt(0).toUpperCase()}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0" aria-hidden="true">
                       <h3 className="font-extrabold text-slate-900 dark:text-white text-sm truncate">{s.name}</h3>
-                      <p className="text-[11px] text-slate-400 font-semibold">{s.employeeId || 'Agent'} • {s.totalFiles} files</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold">{s.employeeId || 'Agent'} • {s.totalFiles} files</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0" aria-hidden="true">
                     <div className="text-right">
-                      <div className="text-[10px] uppercase font-bold text-slate-400">Target Progress</div>
+                      <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Target Progress</div>
                       <div className={`text-sm font-black font-mono ${pct >= 100 ? 'text-emerald-500' : pct >= 50 ? 'text-amber-500' : 'text-rose-500'}`}>
                         {s.monthlyTarget > 0 ? `${pct.toFixed(0)}%` : '—'}
                       </div>
                     </div>
-                    {expanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                    {expanded ? <ChevronDown className="w-4 h-4 text-slate-500" aria-hidden="true" /> : <ChevronRight className="w-4 h-4 text-slate-500" aria-hidden="true" />}
                   </div>
                 </div>
 
@@ -354,7 +358,15 @@ const AgentProfilesPage: React.FC = () => {
                     </span>
                     <span className="text-emerald-600 dark:text-emerald-400 font-mono">BDT {fmtMoney(s.monthCollected)} collected</span>
                   </div>
-                  <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div
+                    role="progressbar"
+                    aria-label={`${s.name} monthly target progress`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(s.monthlyTarget > 0 ? pct : 0)}
+                    aria-valuetext={s.monthlyTarget > 0 ? `${Math.round(pct)}% of BDT ${s.monthlyTarget.toLocaleString()} collected` : 'No target set'}
+                    className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden"
+                  >
                     <div
                       className={`h-full rounded-full transition-all ${pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
                       style={{ width: `${s.monthlyTarget > 0 ? Math.max(2, pct) : 0}%` }}
@@ -364,19 +376,19 @@ const AgentProfilesPage: React.FC = () => {
 
                 {/* Quick stats row */}
                 <div className="mt-4 grid grid-cols-4 gap-2 text-center">
-                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60">
+                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
                     <div className="text-[9px] uppercase font-bold text-slate-400">Files</div>
                     <div className="text-sm font-black text-slate-800 dark:text-slate-100">{s.totalFiles}</div>
                   </div>
-                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60">
+                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
                     <div className="text-[9px] uppercase font-bold text-slate-400">Outstanding</div>
                     <div className="text-sm font-black text-rose-600 dark:text-rose-400 font-mono">{fmtMoney(s.totalOutstanding)}</div>
                   </div>
-                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60">
+                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
                     <div className="text-[9px] uppercase font-bold text-slate-400">Overdue</div>
                     <div className="text-sm font-black text-amber-600 dark:text-amber-400 font-mono">{fmtMoney(s.totalOverdue)}</div>
                   </div>
-                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60">
+                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
                     <div className="text-[9px] uppercase font-bold text-slate-400">PTP Missed</div>
                     <div className="text-sm font-black text-rose-600 dark:text-rose-400">{s.ptpMissed}</div>
                   </div>
@@ -385,23 +397,23 @@ const AgentProfilesPage: React.FC = () => {
 
               {/* Expanded detail */}
               {expanded && (
-                <div className="px-5 pb-5 space-y-4 border-t border-slate-100 dark:border-slate-800/60 pt-4">
+                <div id={`agent-panel-${s.id}`} className="px-5 pb-5 space-y-4 border-t border-slate-100 dark:border-slate-800/60 pt-4">
                   {/* Field activity */}
                   <div>
-                    <h4 className="text-[11px] uppercase font-bold text-slate-400 mb-2">Field Activity</h4>
+                    <h4 className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-2">Field Activity</h4>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex items-center gap-2.5">
-                        <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <MapPin className="w-4 h-4 text-emerald-500 shrink-0" aria-hidden="true" />
                         <div>
                           <div className="font-black text-slate-800 dark:text-slate-100">{s.visitedFiles} visited</div>
-                          <div className="text-[10px] text-slate-400">{s.notVisitedFiles} not visited yet</div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400">{s.notVisitedFiles} not visited yet</div>
                         </div>
                       </div>
                       <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 flex items-center gap-2.5">
-                        <ClipboardList className="w-4 h-4 text-blue-500 shrink-0" />
+                        <ClipboardList className="w-4 h-4 text-blue-500 shrink-0" aria-hidden="true" />
                         <div>
                           <div className="font-black text-slate-800 dark:text-slate-100">{s.remarkedFiles} updated</div>
-                          <div className="text-[10px] text-slate-400">{s.notRemarkFiles} without remarks</div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400">{s.notRemarkFiles} without remarks</div>
                         </div>
                       </div>
                     </div>
@@ -409,7 +421,9 @@ const AgentProfilesPage: React.FC = () => {
 
                   {/* PTP outcomes */}
                   <div>
-                    <h4 className="text-[11px] uppercase font-bold text-slate-400 mb-2">Promise-to-Pay Outcomes</h4>
+                    <h4 className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-2">
+                      Promise-to-Pay (PTP) Outcomes
+                    </h4>
                     <div className="grid grid-cols-3 gap-2 text-center text-xs">
                       <div className="p-2.5 rounded-xl bg-rose-500/5 border border-rose-500/20">
                         <AlertTriangle className="w-3.5 h-3.5 text-rose-500 mx-auto mb-1" />
@@ -427,7 +441,7 @@ const AgentProfilesPage: React.FC = () => {
                         <div className="text-[10px] text-slate-400 font-bold">Successful</div>
                       </div>
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-1.5 font-medium">
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 font-medium">
                       Total active PTPs: {s.ptpTotal} • Lifetime collected: <span className="font-bold text-emerald-500">BDT {fmtMoney(s.totalCollected)}</span>
                     </div>
                   </div>
@@ -435,7 +449,7 @@ const AgentProfilesPage: React.FC = () => {
                   {/* Bank–Product portfolio sections */}
                   {s.portfolios.length > 0 && (
                     <div>
-                      <h4 className="text-[11px] uppercase font-bold text-slate-400 mb-2">Portfolio by Bank & Product</h4>
+                      <h4 className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-2">Portfolio by Bank & Product</h4>
                       <div className="space-y-2">
                         {s.portfolios.map(p => {
                           const max = s.portfolios[0].count || 1;
@@ -454,24 +468,24 @@ const AgentProfilesPage: React.FC = () => {
                               </div>
                               <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
                                 <div className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
-                                  <div className="text-[9px] font-bold text-slate-400 uppercase">Visited</div>
+                                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Visited</div>
                                   <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">{p.visited}</div>
-                                  <div className="text-[9px] text-slate-400">{p.notVisited} left</div>
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400">{p.notVisited} left</div>
                                 </div>
                                 <div className="p-1.5 rounded-lg bg-blue-500/5 border border-blue-500/15">
-                                  <div className="text-[9px] font-bold text-slate-400 uppercase">Updated</div>
+                                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Updated</div>
                                   <div className="text-xs font-black text-blue-600 dark:text-blue-400">{p.updated}</div>
-                                  <div className="text-[9px] text-slate-400">{p.notUpdated} left</div>
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400">{p.notUpdated} left</div>
                                 </div>
                                 <div className="p-1.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
-                                  <div className="text-[9px] font-bold text-slate-400 uppercase">Not Visited</div>
+                                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Not Visited</div>
                                   <div className="text-xs font-black text-amber-600 dark:text-amber-400">{p.notVisited}</div>
-                                  <div className="text-[9px] text-slate-400">of {p.count}</div>
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400">of {p.count}</div>
                                 </div>
                                 <div className="p-1.5 rounded-lg bg-rose-500/5 border border-rose-500/15">
-                                  <div className="text-[9px] font-bold text-slate-400 uppercase">Collected</div>
+                                  <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Collected</div>
                                   <div className="text-xs font-black text-rose-600 dark:text-rose-400 font-mono">{fmtMoney(p.collected)}</div>
-                                  <div className="text-[9px] text-slate-400">BDT total</div>
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400">BDT total</div>
                                 </div>
                               </div>
                             </div>
