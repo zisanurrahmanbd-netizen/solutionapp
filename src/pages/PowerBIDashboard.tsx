@@ -11,6 +11,7 @@ import {
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import { useAuth } from '../context/AuthContext';
 import { dataService, normalizeBankKey } from '../services/dataService';
+import { caseMatchesAgent, recordBelongsToAgentCases } from '../services/agentMatching';
 import { CaseFile, Collection } from '../types';
 
 ChartJS.register(
@@ -283,17 +284,19 @@ export const PowerBIDashboard: React.FC = () => {
   const agents = useMemo(() => users.filter(u => u.role === 'agent'), [users, targetVersion]);
 
   const agentMonthly = useMemo(() => {
-    const approvedByAgent = new Map<number, Map<string, number>>();
-    collections.forEach(col => {
-      if (!isApproved(col)) return;
-      const m = collectionMonth(col);
-      if (!approvedByAgent.has(col.agent_id)) approvedByAgent.set(col.agent_id, new Map());
-      const mm = approvedByAgent.get(col.agent_id)!;
-      mm.set(m, (mm.get(m) || 0) + num(col.amount));
-    });
     return agents.map(a => {
-      const own = cases.filter(c => c.assigned_agent_id === a.id);
-      const perMonth = approvedByAgent.get(a.id) || new Map<string, number>();
+      // Match by id OR agent_name (sheet uploads link files by name only)
+      const own = cases.filter(c => caseMatchesAgent(c, a));
+      const ownCaseIds = new Set(own.map(c => c.id));
+      // Credit collections by agent_id OR by belonging to the agent's cases
+      const ownApproved = collections.filter(
+        col => isApproved(col) && recordBelongsToAgentCases(col, ownCaseIds, a.id)
+      );
+      const perMonth = new Map<string, number>();
+      ownApproved.forEach(col => {
+        const m = collectionMonth(col);
+        perMonth.set(m, (perMonth.get(m) || 0) + num(col.amount));
+      });
       const monthly = monthOptions.map(m => {
         const own_m = own.filter(c => caseMonth(c) === m);
         const collected = perMonth.get(m) || 0;
