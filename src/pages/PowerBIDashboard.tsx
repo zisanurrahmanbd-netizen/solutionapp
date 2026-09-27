@@ -247,27 +247,68 @@ export const PowerBIDashboard: React.FC = () => {
     };
   };
 
+  // ─── Monthly charts: money is grouped by the month it was COLLECTED ───────
+  // (collected_at / payment date), never by the allocation month of the file
+  // it was collected on. Overdue & file counts stay grouped by allocation month.
+  const approvedCollectionByMonth = (ids?: Set<number>): Map<string, number> => {
+    const map = new Map<string, number>();
+    collections.forEach(col => {
+      if (!isApproved(col)) return;
+      if (ids && !ids.has(col.case_file_id)) return;
+      const m = collectionMonth(col);
+      map.set(m, (map.get(m) || 0) + num(col.amount));
+    });
+    return map;
+  };
+
+  /** Chart month axis = allocation months + every month that has real collections. */
+  const chartMonthAxis = (base: string[], byMonth: Map<string, number>): string[] =>
+    Array.from(new Set([...base, ...Array.from(byMonth.keys())]))
+      .filter(m => m !== 'unknown')
+      .sort()
+      .slice(-12);
+
+  const monthRow = (m: string, list: CaseFile[], byMonth: Map<string, number>) => {
+    const overdue = list.reduce((s, c) => s + num(c.overdue_amount), 0);
+    const outstanding = list.reduce((s, c) => s + num(c.outstanding_amount), 0);
+    const collected = byMonth.get(m) || 0;
+    return {
+      month: m, files: list.length, overdue, outstanding, collected,
+      rate: overdue > 0 ? (collected / overdue) * 100 : 0,
+    };
+  };
+
   // Tiles for the current bank + type + allocation-month selection
+  const scopedIds = useMemo(() => new Set(scoped.map(c => c.id)), [scoped, targetVersion]);
   const tileSum = useMemo(() => {
     const list = selMonth === 'all' ? scoped : scoped.filter(c => caseMonth(c) === selMonth);
-    return sumTiles(list);
-  }, [scoped, selMonth, collections, targetVersion]);
+    const base = sumTiles(list);
+    if (selMonth === 'all') return base;
+    // A picked month shows money COLLECTED in that month (matches the chart bars)
+    const byMonth = approvedCollectionByMonth(scopedIds);
+    const collected = byMonth.get(selMonth) || 0;
+    return { ...base, collected, rate: base.overdue > 0 ? (collected / base.overdue) * 100 : 0 };
+  }, [scoped, scopedIds, selMonth, collections, targetVersion]);
 
   // Monthly series for the scoped bank + type (charts always show all months,
   // picked month highlighted)
-  const scopedMonths = useMemo(() => monthOptions.map(m => {
-    const list = scoped.filter(c => caseMonth(c) === m);
-    return { month: m, ...sumTiles(list) };
-  }), [scoped, monthOptions, collections, targetVersion]);
+  const scopedMonths = useMemo(() => {
+    const byMonth = approvedCollectionByMonth(scopedIds);
+    return chartMonthAxis(monthOptions, byMonth).map(m =>
+      monthRow(m, scoped.filter(c => caseMonth(c) === m), byMonth)
+    );
+  }, [scoped, scopedIds, monthOptions, collections, targetVersion]);
 
   const barColors = (base: string, dim: string) =>
     scopedMonths.map(r => (selMonth === 'all' || r.month === selMonth ? base : dim));
 
   // ─── Overall portfolio per month (all banks, all types) ───────────────────
-  const overallMonths = useMemo(() => monthOptions.map(m => {
-    const list = cases.filter(c => caseMonth(c) === m);
-    return { month: m, ...sumTiles(list) };
-  }), [cases, monthOptions, collections, targetVersion]);
+  const overallMonths = useMemo(() => {
+    const byMonth = approvedCollectionByMonth();
+    return chartMonthAxis(monthOptions, byMonth).map(m =>
+      monthRow(m, cases.filter(c => caseMonth(c) === m), byMonth)
+    );
+  }, [cases, monthOptions, collections, targetVersion]);
 
   const totals = useMemo(() => {
     const totalFiles = cases.length;
@@ -297,7 +338,11 @@ export const PowerBIDashboard: React.FC = () => {
         const m = collectionMonth(col);
         perMonth.set(m, (perMonth.get(m) || 0) + num(col.amount));
       });
-      const monthly = monthOptions.map(m => {
+      // Axis: allocation months + every month this agent actually collected,
+      // so Sep payments never vanish just because no files were allocated then
+      const axisSet = new Set(monthOptions);
+      perMonth.forEach((_v, m) => { if (m !== 'unknown') axisSet.add(m); });
+      const monthly = Array.from(axisSet).sort().slice(-12).map(m => {
         const own_m = own.filter(c => caseMonth(c) === m);
         const collected = perMonth.get(m) || 0;
         const overdue = own_m.reduce((s, c) => s + num(c.overdue_amount), 0);
