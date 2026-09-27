@@ -1679,6 +1679,16 @@ class DataService {
     return this.checkIns.filter(c => c.case_file_id === caseId);
   }
 
+  /** All remarks (admin-level analytics). */
+  public getAllRemarks(): CaseRemark[] {
+    return [...this.remarks].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  /** All GPS check-ins (admin-level analytics). */
+  public getAllCheckIns(): CheckIn[] {
+    return [...this.checkIns];
+  }
+
   public addRemark(remark: Omit<CaseRemark, 'id'>): CaseRemark {
     const newR: CaseRemark = {
       ...remark,

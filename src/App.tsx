@@ -8,6 +8,7 @@ import { CaseDetail } from './pages/CaseDetail';
 import { TrackingMap } from './pages/TrackingMap';
 import { BankContactsPage } from './pages/BankContacts';
 import { AgentPerformancePage } from './pages/AgentPerformance';
+import { AgentProfilesPage } from './pages/AgentProfiles';
 import { ExpiryTrackerPage } from './pages/ExpiryTracker';
 import { FlaggedCasesPage } from './pages/FlaggedCases';
 import { TeamManagementPage } from './pages/TeamManagement';
@@ -66,6 +67,8 @@ export const App: React.FC = () => {
         return <Dashboard onSelectCase={handleSelectCase} onNavigate={setCurrentPage} />;
       case 'powerbi':
         return <PowerBIDashboard />;
+      case 'agent_profiles':
+        return <AgentProfilesPage />;
       case 'cases':
         return <CasesList onSelectCase={handleSelectCase} searchQuery={searchQuery} />;
       case 'map':

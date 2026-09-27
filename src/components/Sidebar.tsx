@@ -23,6 +23,7 @@ import {
   BarChart3,
   FileDown,
   MessageSquareMore,
+  UserRound,
   ChevronLeft,
   ChevronRight,
   Smartphone
@@ -72,6 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems: { id: string; label: string; icon: any; perm: PermissionKey; badge?: number; section: string }[] = [
     { id: "dashboard", label: t("nav.dashboard", "Dashboard"), icon: LayoutDashboard, perm: "view_dashboard", section: "Overview" },
     { id: "powerbi", label: "Graphs & Analytics", icon: BarChart3, perm: "view_powerbi", section: "Overview" },
+    { id: "agent_profiles", label: "Agent Profiles", icon: UserRound, perm: "view_powerbi", section: "Overview" },
     { id: "cases", label: t("nav.cases", "Bank & MNC Files"), icon: Briefcase, perm: "view_cases", section: "Operations" },
     { id: "file_export", label: "File Update Export", icon: FileDown, perm: "export_excel", section: "Operations" },
     { id: "bulk_messages", label: "Bulk Messages", icon: MessageSquareMore, perm: "send_bulk_messages", section: "Operations" },
