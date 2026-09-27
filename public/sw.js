@@ -1,6 +1,6 @@
 /* RecoveryCORE Service Worker — offline shell + runtime caching.
    Supabase API calls are never cached (always live). */
-const VERSION = 'rcore-v18';
+const VERSION = 'rcore-v19';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 

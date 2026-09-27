@@ -378,25 +378,44 @@ export const PowerBIDashboard: React.FC = () => {
   };
 
   // Per-month overview: total files (count) + overdue/outstanding/collected (BDT).
-  // Money on the left axis, files line on its own right axis so both scales stay readable.
+  // Bars (money, left axis) are the focus; files is a thin dashed reference line (right axis).
   const monthlyOverviewChart = {
     labels: overallMonths.map(r => monthLabel(r.month)),
     datasets: [
-      { label: 'Overdue (BDT)', data: overallMonths.map(r => r.overdue), backgroundColor: 'rgba(244,63,94,0.75)', borderRadius: 5, order: 2 },
-      { label: 'Outstanding (BDT)', data: overallMonths.map(r => r.outstanding), backgroundColor: 'rgba(249,115,22,0.7)', borderRadius: 5, order: 2 },
-      { label: 'Collected (BDT)', data: overallMonths.map(r => r.collected), backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 5, order: 2 },
-      { type: 'line', label: 'Files', data: overallMonths.map(r => r.files), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.14)', fill: true, tension: 0.35, pointRadius: 3, yAxisID: 'files', order: 1 },
+      { label: 'Overdue (BDT)', data: overallMonths.map(r => r.overdue), backgroundColor: 'rgba(244,63,94,0.8)', borderRadius: 4, maxBarThickness: 26 },
+      { label: 'Outstanding (BDT)', data: overallMonths.map(r => r.outstanding), backgroundColor: 'rgba(249,115,22,0.75)', borderRadius: 4, maxBarThickness: 26 },
+      { label: 'Collected (BDT)', data: overallMonths.map(r => r.collected), backgroundColor: 'rgba(16,185,129,0.8)', borderRadius: 4, maxBarThickness: 26 },
+      { type: 'line', label: 'Files', data: overallMonths.map(r => r.files), borderColor: '#64748b', borderDash: [5, 4], borderWidth: 1.5, fill: false, tension: 0.35, pointRadius: 2.5, pointBackgroundColor: '#ffffff', pointBorderColor: '#64748b', pointBorderWidth: 1.5, yAxisID: 'files' },
     ],
   };
 
   const monthlyOverviewOptions = {
     ...CHART_OPTIONS,
     interaction: { mode: 'index', intersect: false },
-    plugins: { legend: { display: true, labels: { boxWidth: 10, font: { size: 10 } } } },
+    plugins: {
+      legend: { display: true, labels: { boxWidth: 10, boxHeight: 10, font: { size: 10 } } },
+      tooltip: {
+        backgroundColor: 'rgba(15,23,42,0.95)',
+        cornerRadius: 10,
+        padding: 10,
+        titleFont: { size: 11, weight: 'bold' },
+        bodyFont: { size: 11 },
+        boxWidth: 8,
+        boxHeight: 8,
+        callbacks: {
+          label: (ctx: any) => {
+            const v = Number(ctx.parsed.y) || 0;
+            return ctx.dataset.label === 'Files'
+              ? ` Files: ${v.toLocaleString()}`
+              : ` ${ctx.dataset.label.replace(' (BDT)', '')}: BDT ${fmtMoney(v)}`;
+          },
+        },
+      },
+    },
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 10 } } },
       y: { position: 'left', grid: { color: 'rgba(148,163,184,0.15)' }, ticks: { font: { size: 10 }, callback: (v: any) => fmtMoney(Number(v)) } },
-      files: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, precision: 0 } },
+      files: { position: 'right', grid: { display: false }, border: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8', precision: 0 } },
     },
   } as any;
 
