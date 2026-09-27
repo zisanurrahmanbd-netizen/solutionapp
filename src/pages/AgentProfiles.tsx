@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dataService } from '../services/dataService';
+import { dataService, normalizeBankKey } from '../services/dataService';
 import { CaseFile, Collection, CheckIn, CaseRemark, User } from '../types';
 import {
   Users, Search, Target, TrendingUp, MapPin, ClipboardList,
@@ -181,20 +181,35 @@ const AgentProfilesPage: React.FC = () => {
         });
         ptpReissued = casesWithMultiPtp.size;
 
-        // Bank–Product portfolio sections (e.g. "One Bank – Loan",
-        // "DBBL – Credit Card", "Asian Paints – Dealers")
+        // Bank–Product portfolio sections — same sources and precedence as the
+        // Dashboard's "Bank Portfolio Distribution" widget so the labels match
+        // (One Bank – Loan, DBBL – Credit Card, Asian Paints – Dealers …).
         const groupMap = new Map<string, { label: string; cases: CaseFile[] }>();
         agentCases.forEach(c => {
-          const bank = c.bank?.name || c.bank_name || 'Unassigned Bank';
-          const product =
-            c.product_name ||
-            c.product?.name ||
-            c.extra_attributes?.PRODUCT_NAME ||
+          const bank = (
+            c.bank_name?.trim() ||
+            c.extra_attributes?.BANK_NAME?.trim() ||
+            c.bank?.name ||
+            'Other'
+          );
+          const fileType = String(
             c.extra_attributes?.FILE_TYPE ||
-            'General';
-          const key = `${bank}||${product}`;
-          if (!groupMap.has(key)) groupMap.set(key, { label: `${bank} – ${product}`, cases: [] });
-          groupMap.get(key)!.cases.push(c);
+            c.extra_attributes?.file_type ||
+            c.product_name ||
+            ''
+          ).trim();
+          const label = fileType && fileType.toUpperCase() !== 'N/A'
+            ? `${bank} – ${fileType}`
+            : bank;
+          // Merge case-spelling variants ("DBBL Personal LOAN" vs "DBBL PERSONAL LOAN")
+          const key = normalizeBankKey(label);
+          const existing = groupMap.get(key);
+          if (existing) {
+            existing.cases.push(c);
+            if (label.length < existing.label.length) existing.label = label;
+          } else {
+            groupMap.set(key, { label, cases: [c] });
+          }
         });
 
         const portfolios = [...groupMap.values()]
