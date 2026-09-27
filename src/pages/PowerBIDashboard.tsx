@@ -377,6 +377,29 @@ export const PowerBIDashboard: React.FC = () => {
     ],
   };
 
+  // Per-month overview: total files (count) + overdue/outstanding/collected (BDT).
+  // Money on the left axis, files line on its own right axis so both scales stay readable.
+  const monthlyOverviewChart = {
+    labels: overallMonths.map(r => monthLabel(r.month)),
+    datasets: [
+      { label: 'Overdue (BDT)', data: overallMonths.map(r => r.overdue), backgroundColor: 'rgba(244,63,94,0.75)', borderRadius: 5, order: 2 },
+      { label: 'Outstanding (BDT)', data: overallMonths.map(r => r.outstanding), backgroundColor: 'rgba(249,115,22,0.7)', borderRadius: 5, order: 2 },
+      { label: 'Collected (BDT)', data: overallMonths.map(r => r.collected), backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 5, order: 2 },
+      { type: 'line', label: 'Files', data: overallMonths.map(r => r.files), borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.14)', fill: true, tension: 0.35, pointRadius: 3, yAxisID: 'files', order: 1 },
+    ],
+  };
+
+  const monthlyOverviewOptions = {
+    ...CHART_OPTIONS,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { display: true, labels: { boxWidth: 10, font: { size: 10 } } } },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: { position: 'left', grid: { color: 'rgba(148,163,184,0.15)' }, ticks: { font: { size: 10 }, callback: (v: any) => fmtMoney(Number(v)) } },
+      files: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 }, precision: 0 } },
+    },
+  } as any;
+
   const selectCls = "w-full px-3 py-2 text-xs rounded-xl bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/40";
 
   return (
@@ -522,6 +545,19 @@ export const PowerBIDashboard: React.FC = () => {
           <div className="h-60">
             <Line data={overallFilesChart} options={CHART_OPTIONS as any} />
           </div>
+        </div>
+      </div>
+
+      {/* Monthly overview: files + money per month */}
+      <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-indigo-500" /> Monthly Overview — Files, Overdue, Outstanding &amp; Collected
+          </h3>
+          <span className="text-[10px] text-slate-400 font-bold uppercase">bars = BDT (left) · line = files (right)</span>
+        </div>
+        <div className="h-64">
+          <Bar data={monthlyOverviewChart as any} options={monthlyOverviewOptions} />
         </div>
       </div>
 
