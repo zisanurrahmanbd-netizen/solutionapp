@@ -179,18 +179,10 @@ export const BulkMessagesPage: React.FC = () => {
       .map(r => r.name);
   }, [audience, selectedKeys, teamRecipients]);
 
-  // Banks present in the selected agent('s) files, with live file counts
-  const agentBankChips = useMemo(() => {
-    if (audience !== 'agents') return [];
-    const scope = fAgent !== 'all'
-      ? allCases.filter(c => c.agent_name === fAgent)
-      : selectedAgentNames.length > 0
-        ? allCases.filter(c => c.agent_name && selectedAgentNames.includes(c.agent_name))
-        : [];
-    return banksIn(scope);
-  }, [audience, fAgent, selectedAgentNames, allCases]);
-
-  const banksIn = (scope: CaseFile[]) => {
+  // NOTE: declared with `function` so it hoists — the memos below call it
+  // during their first render pass (a const arrow here caused a TDZ crash:
+  // "Cannot access ... before initialization" when opening Field Agents).
+  function banksIn(scope: CaseFile[]) {
     const countByKey = new Map<string, { name: string; count: number }>();
     scope.forEach(c => {
       const b = (c.bank_name || c.bank?.name || String(c.extra_attributes?.BANK_NAME || '')).trim() || 'Unknown Bank';
@@ -201,7 +193,18 @@ export const BulkMessagesPage: React.FC = () => {
       else countByKey.set(k, { name, count: 1 });
     });
     return Array.from(countByKey.values()).sort((a, b) => b.count - a.count);
-  };
+  }
+
+  // Banks present in the selected agent('s) files, with live file counts
+  const agentBankChips = useMemo(() => {
+    if (audience !== 'agents') return [];
+    const scope = fAgent !== 'all'
+      ? allCases.filter(c => c.agent_name === fAgent)
+      : selectedAgentNames.length > 0
+        ? allCases.filter(c => c.agent_name && selectedAgentNames.includes(c.agent_name))
+        : [];
+    return banksIn(scope);
+  }, [audience, fAgent, selectedAgentNames, allCases]);
 
   // ── Recipients: customers ────────────────────────────────────────
   const customerRecipients: BulkRecipient[] = useMemo(() => {
