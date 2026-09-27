@@ -185,7 +185,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <React.Fragment key={item.id}>
                   {showHeader && (
                     <div className={`pt-2 pb-1 ${idx === 0 ? "" : "mt-2 border-t border-zinc-200 dark:border-zinc-800"}`}>
-                      <span className="px-3.5 text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-600">
+                      <span className="px-3.5 text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
                         {item.section}
                       </span>
                     </div>

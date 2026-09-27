@@ -4,7 +4,15 @@ import { usePermissions } from '../context/PermissionsContext';
 import { useLanguage } from '../context/LanguageContext';
 import { dataService, PtpAlertItem } from '../services/dataService';
 import { StatusBadge } from '../components/StatusBadge';
+import { StatCard } from '../components/ui/StatCard';
 import { formatDate } from '../services/dateFormat';
+import {
+  Chart as ChartJS,
+  CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend, Filler,
+} from 'chart.js';
+import { Bar, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend, Filler);
 import { 
   FolderCheck, 
   Clock, 
@@ -312,120 +320,141 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectCase, onNavigate }
         </div>
       )}
 
-      {/* KPI Cards Grid */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${user?.role === 'agent' ? '2xl:grid-cols-4' : '2xl:grid-cols-5'} gap-4`}>
+      {/* KPI Cards Grid — colorful SaaS style */}
+      <div className={`grid grid-cols-2 lg:grid-cols-3 ${user?.role === 'agent' ? '2xl:grid-cols-4' : '2xl:grid-cols-5'} gap-4`}>
         {/* Today's PTP Card */}
-        <div 
+        <StatCard
+          tone="mint"
+          label={t('dash.ptp_today', 'Due Today (PTP)')}
+          value={`${todayPtps.length} Cases`}
+          sub="Click to view & follow up"
+          icon={<Calendar className="w-4 h-4" />}
           onClick={() => { setActiveTab('today'); setShowPtpPopup(true); }}
-          className="p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm cursor-pointer hover:border-zinc-400 dark:hover:border-zinc-600 transition-all"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-              {t('dash.ptp_today', 'Due Today (PTP)')}
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center">
-              <Calendar className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
-              {todayPtps.length} Cases
-            </div>
-            <div className="text-xs text-zinc-500 mt-1 flex items-center gap-1">
-              <span className="font-bold text-zinc-700 dark:text-zinc-300">Click to view & follow up</span>
-            </div>
-          </div>
-        </div>
+        />
 
         {/* Missed Payment Card */}
-        <div 
+        <StatCard
+          tone="rose"
+          label={t('dash.overdue_portfolio', 'Missed PTP / Broken')}
+          value={`${missedPtps.length} Cases`}
+          sub="Overdue commitment dates"
+          icon={<ShieldAlert className="w-4 h-4" />}
           onClick={() => { setActiveTab('missed'); setShowPtpPopup(true); }}
-          className="p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 shadow-sm cursor-pointer hover:border-zinc-500 transition-all"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-              {t('dash.overdue_portfolio', 'Missed PTP / Broken')}
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center">
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
-              {missedPtps.length} Cases
-            </div>
-            <div className="text-xs text-zinc-500 mt-1">
-              Overdue commitment dates
-            </div>
-          </div>
-        </div>
+        />
 
         {/* Unallocated Files Card (Hidden for agents) */}
         {user?.role !== 'agent' && (
-          <div 
+          <StatCard
+            tone="amber"
+            label="Unallocated Files"
+            value={`${unallocatedCases.length} Files`}
+            sub={unallocatedOutstanding > 0 ? `BDT ${unallocatedOutstanding.toLocaleString()} unassigned` : 'All files assigned'}
+            icon={<UserX className="w-4 h-4" />}
             onClick={() => onNavigate('cases')}
-            className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-amber-500/30 shadow-sm cursor-pointer hover:border-amber-500 transition-all"
-            title="Click to view all unallocated cases"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-                Unallocated Files
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center">
-                <UserX className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
-                {unallocatedCases.length} Files
-              </div>
-              <div className="text-xs text-slate-500 mt-1">
-                {unallocatedOutstanding > 0 ? `BDT ${unallocatedOutstanding.toLocaleString()} unassigned` : 'All files assigned'}
-              </div>
-            </div>
-          </div>
+          />
         )}
 
         {/* Total Portfolio Card / My Assigned Portfolio Card */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-              {user?.role === 'agent' ? 'My Assigned Portfolio' : t('dash.total_allocated', 'Total Portfolio')}
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center">
-              <Coins className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              BDT {summary.total_outstanding.toLocaleString()}
-            </div>
-            <div className="text-xs text-slate-500 mt-1">
-              {summary.total_files} {user?.role === 'agent' ? 'my assigned files' : 'active recovery cases'}
-            </div>
-          </div>
-        </div>
+        <StatCard
+          tone="sky"
+          label={user?.role === 'agent' ? 'My Assigned Portfolio' : t('dash.total_allocated', 'Total Portfolio')}
+          value={`BDT ${summary.total_outstanding.toLocaleString()}`}
+          sub={`${summary.total_files} ${user?.role === 'agent' ? 'my assigned files' : 'active recovery cases'}`}
+          icon={<Coins className="w-4 h-4" />}
+        />
 
         {/* Total Collected Card / My Collected Cash */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-              {user?.role === 'agent' ? 'My Collected Cash' : t('dash.total_collected', 'Total Collected')}
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
-              BDT {summary.total_collected.toLocaleString()}
-            </div>
-            <div className="text-xs text-zinc-500 mt-1">
-              {summary.total_outstanding > 0 ? ((summary.total_collected / summary.total_outstanding) * 100).toFixed(1) : 0}% {t('dash.recovery_rate', 'recovery rate')}
-            </div>
-          </div>
-        </div>
+        <StatCard
+          tone="violet"
+          label={user?.role === 'agent' ? 'My Collected Cash' : t('dash.total_collected', 'Total Collected')}
+          value={`BDT ${summary.total_collected.toLocaleString()}`}
+          sub={`${summary.total_outstanding > 0 ? ((summary.total_collected / summary.total_outstanding) * 100).toFixed(1) : 0}% ${t('dash.recovery_rate', 'recovery rate')}`}
+          icon={<TrendingUp className="w-4 h-4" />}
+        />
       </div>
+
+      {/* Charts row — donut portfolio share + 7-day collections bar */}
+      {user?.role !== 'agent' && charts.files_by_bank.labels.length > 0 && (() => {
+        const labels: string[] = charts.files_by_bank.labels.slice(0, 6);
+        const counts: number[] = charts.files_by_bank.counts.slice(0, 6);
+        const PALETTE = ['#10b981', '#0ea5e9', '#f59e0b', '#f43f5e', '#8b5cf6', '#64748b'];
+        // Collections trend: last 7 days from all collections
+        const days: string[] = [];
+        const collectedByDay: number[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const key = d.toISOString().slice(0, 10);
+          days.push(`${d.getDate()}/${d.getMonth() + 1}`);
+          collectedByDay.push(
+            dataService.getAllCollections()
+              .filter(c => (c.collected_at || '').slice(0, 10) === key)
+              .reduce((s, c) => s + (Number(c.amount) || 0), 0)
+          );
+        }
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-2 p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+              <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-3">
+                Portfolio Share by Bank
+              </h3>
+              <div className="h-56">
+                <Doughnut
+                  data={{
+                    labels,
+                    datasets: [{
+                      data: counts,
+                      backgroundColor: PALETTE,
+                      borderWidth: 2,
+                      borderColor: '#ffffff',
+                      hoverOffset: 6,
+                    }],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '62%',
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } },
+                  } as any}
+                />
+              </div>
+            </div>
+            <div className="lg:col-span-3 p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  Collections — Last 7 Days
+                </h3>
+                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  BDT {collectedByDay.reduce((s, v) => s + v, 0).toLocaleString()} total
+                </span>
+              </div>
+              <div className="h-56">
+                <Bar
+                  data={{
+                    labels: days,
+                    datasets: [{
+                      label: 'Collected (BDT)',
+                      data: collectedByDay,
+                      backgroundColor: '#10b981',
+                      borderRadius: 8,
+                      maxBarThickness: 38,
+                    }],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      y: { beginAtZero: true, ticks: { font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.15)' } },
+                      x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+                    },
+                  } as any}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Middle Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

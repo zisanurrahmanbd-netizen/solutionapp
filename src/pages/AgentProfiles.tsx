@@ -374,23 +374,23 @@ const AgentProfilesPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Quick stats row */}
+                {/* Quick stats row — pastel tiles */}
                 <div className="mt-4 grid grid-cols-4 gap-2 text-center">
-                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
-                    <div className="text-[9px] uppercase font-bold text-slate-400">Files</div>
-                    <div className="text-sm font-black text-slate-800 dark:text-slate-100">{s.totalFiles}</div>
+                  <div className="p-2 rounded-xl bg-sky-50 dark:bg-sky-950/30 border border-sky-200/60 dark:border-sky-800/40">
+                    <div className="text-[10px] uppercase font-bold text-sky-800/70 dark:text-sky-300/70">Files</div>
+                    <div className="text-sm font-black text-sky-700 dark:text-sky-200 tabular-nums">{s.totalFiles}</div>
                   </div>
-                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
-                    <div className="text-[9px] uppercase font-bold text-slate-400">Outstanding</div>
-                    <div className="text-sm font-black text-rose-600 dark:text-rose-400 font-mono">{fmtMoney(s.totalOutstanding)}</div>
+                  <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-800/40">
+                    <div className="text-[10px] uppercase font-bold text-rose-800/70 dark:text-rose-300/70">Outstanding</div>
+                    <div className="text-sm font-black text-rose-700 dark:text-rose-200 tabular-nums">{fmtMoney(s.totalOutstanding)}</div>
                   </div>
-                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
-                    <div className="text-[9px] uppercase font-bold text-slate-400">Overdue</div>
-                    <div className="text-sm font-black text-amber-600 dark:text-amber-400 font-mono">{fmtMoney(s.totalOverdue)}</div>
+                  <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40">
+                    <div className="text-[10px] uppercase font-bold text-amber-800/70 dark:text-amber-300/70">Overdue</div>
+                    <div className="text-sm font-black text-amber-700 dark:text-amber-200 tabular-nums">{fmtMoney(s.totalOverdue)}</div>
                   </div>
-                  <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800">
-                    <div className="text-[9px] uppercase font-bold text-slate-400">PTP Missed</div>
-                    <div className="text-sm font-black text-rose-600 dark:text-rose-400">{s.ptpMissed}</div>
+                  <div className="p-2 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200/60 dark:border-violet-800/40">
+                    <div className="text-[10px] uppercase font-bold text-violet-800/70 dark:text-violet-300/70">PTP Missed</div>
+                    <div className="text-sm font-black text-violet-700 dark:text-violet-200 tabular-nums">{s.ptpMissed}</div>
                   </div>
                 </div>
               </button>

@@ -4,6 +4,7 @@ import { dataService } from '../services/dataService';
 import { exportTableToExcel, exportTableToPdf } from '../services/exportService';
 import { AccessibleModal } from '../components/AccessibleModal';
 import { Button } from '../components/ui/Button';
+import { StatCard } from '../components/ui/StatCard';
 import { useToast } from '../components/ui/Toast';
 import { Collection, CaseFile } from '../types';
 import { 
@@ -333,59 +334,36 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
         </div>
       </div>
 
-      {/* Summary Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Total Collections</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
-              <DollarSign className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-xl font-black text-slate-900 dark:text-white mt-2 font-mono">
-            BDT {stats.totalCollected.toLocaleString()}
-          </div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{stats.totalCount} payment entries</div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Approved (Verified)</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-2 font-mono">
-            BDT {stats.approvedAmount.toLocaleString()}
-          </div>
-          <div className="text-[11px] text-emerald-600 dark:text-emerald-400/80 mt-0.5">{stats.approvedCount} approved files</div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-500/30 bg-amber-50/20 dark:bg-amber-950/10 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-700 dark:text-amber-400">Pending Verification</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-xl font-black text-amber-600 dark:text-amber-400 mt-2 font-mono">
-            BDT {stats.pendingAmount.toLocaleString()}
-          </div>
-          <div className="text-[11px] text-amber-600 dark:text-amber-400/80 mt-0.5">{stats.pendingCount} awaiting approval</div>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-rose-500/30 bg-rose-50/20 dark:bg-rose-950/10 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-700 dark:text-rose-400">Rejected / Disputed</span>
-            <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-600 flex items-center justify-center">
-              <XCircle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-xl font-black text-rose-600 dark:text-rose-400 mt-2 font-mono">
-            BDT {stats.rejectedAmount.toLocaleString()}
-          </div>
-          <div className="text-[11px] text-rose-600 dark:text-rose-400/80 mt-0.5">{stats.rejectedCount} payments rejected</div>
-        </div>
+      {/* Summary Stat Cards — colorful SaaS style */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <StatCard
+          tone="sky"
+          label="Total Collections"
+          value={`BDT ${stats.totalCollected.toLocaleString()}`}
+          sub={`${stats.totalCount} payment entries`}
+          icon={<DollarSign className="w-4 h-4" />}
+        />
+        <StatCard
+          tone="mint"
+          label="Approved (Verified)"
+          value={`BDT ${stats.approvedAmount.toLocaleString()}`}
+          sub={`${stats.approvedCount} approved files`}
+          icon={<CheckCircle2 className="w-4 h-4" />}
+        />
+        <StatCard
+          tone="amber"
+          label="Pending Verification"
+          value={`BDT ${stats.pendingAmount.toLocaleString()}`}
+          sub={`${stats.pendingCount} awaiting approval`}
+          icon={<Clock className="w-4 h-4" />}
+        />
+        <StatCard
+          tone="rose"
+          label="Rejected / Disputed"
+          value={`BDT ${stats.rejectedAmount.toLocaleString()}`}
+          sub={`${stats.rejectedCount} payments rejected`}
+          icon={<XCircle className="w-4 h-4" />}
+        />
       </div>
 
       {/* Filter and Search Bar */}
