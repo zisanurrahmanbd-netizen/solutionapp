@@ -32,6 +32,10 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
 
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+
   const collections = useMemo(() => {
     const all = dataService.getAllCollections();
     if (user?.role === 'agent') {
@@ -138,6 +142,43 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
     if (confirm('Are you sure you want to delete this payment record? It will be permanently removed.')) {
       dataService.deleteCollection(id);
       setRefreshKey(k => k + 1);
+    }
+  };
+
+  // ── Bulk selection ──
+  const allVisibleSelected = filtered.length > 0 && filtered.every(c => selectedIds.has(c.id));
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        filtered.forEach(c => next.delete(c.id));
+      } else {
+        filtered.forEach(c => next.add(c.id));
+      }
+      return next;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Permanently delete ${selectedIds.size} selected payment record(s)? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      selectedIds.forEach(id => dataService.deleteCollection(id));
+      setSelectedIds(new Set());
+      setRefreshKey(k => k + 1);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -304,6 +345,18 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
               {st} {st === 'pending' && stats.pendingCount > 0 && `(${stats.pendingCount})`}
             </button>
           ))}
+
+          {selectedIds.size > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={deleting}
+              className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-rose-600/30 ml-1"
+              title="Delete all selected payment records"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{deleting ? 'Deleting…' : `Delete Selected (${selectedIds.size})`}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -313,6 +366,15 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
           <table className="w-full text-left text-xs min-w-[850px]">
             <thead className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[11px] font-bold">
               <tr>
+                <th className="py-3 px-4 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded cursor-pointer accent-rose-600"
+                    title="Select / deselect all visible rows"
+                  />
+                </th>
                 <th className="py-3 px-4">File & Customer</th>
                 <th className="py-3 px-4">Amount</th>
                 <th className="py-3 px-4">Payment Method / Receipt</th>
@@ -326,7 +388,7 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <p className="font-semibold text-sm">No payment records found</p>
                     <p className="text-xs mt-1">Payments recorded on case files will appear here for verification</p>
                   </td>
@@ -337,7 +399,20 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
                 const st = c.status || 'pending';
 
                 return (
-                  <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr key={c.id} className={`transition-colors ${
+                    selectedIds.has(c.id)
+                      ? 'bg-rose-50 dark:bg-rose-950/20'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                  }`}>
+                    <td className="py-3.5 px-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(c.id)}
+                        onChange={() => toggleSelect(c.id)}
+                        className="w-4 h-4 rounded cursor-pointer accent-rose-600"
+                        title="Select this record"
+                      />
+                    </td>
                     <td className="py-3.5 px-4">
                       {cItem ? (
                         <button
