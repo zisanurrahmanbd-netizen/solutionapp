@@ -382,9 +382,9 @@ export const PowerBIDashboard: React.FC = () => {
   const monthlyOverviewChart = {
     labels: overallMonths.map(r => monthLabel(r.month)),
     datasets: [
-      { label: 'Outstanding (BDT)', data: overallMonths.map(r => r.outstanding), borderColor: 'rgba(249,115,22,0.95)', backgroundColor: 'rgba(249,115,22,0.45)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
-      { label: 'Overdue (BDT)', data: overallMonths.map(r => r.overdue), borderColor: 'rgba(244,63,94,0.95)', backgroundColor: 'rgba(244,63,94,0.45)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
-      { label: 'Collected (BDT)', data: overallMonths.map(r => r.collected), borderColor: 'rgba(16,185,129,0.95)', backgroundColor: 'rgba(16,185,129,0.5)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
+      { type: 'line', label: 'Outstanding (BDT)', data: overallMonths.map(r => r.outstanding), borderColor: 'rgba(249,115,22,0.95)', backgroundColor: 'rgba(249,115,22,0.45)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
+      { type: 'line', label: 'Overdue (BDT)', data: overallMonths.map(r => r.overdue), borderColor: 'rgba(244,63,94,0.95)', backgroundColor: 'rgba(244,63,94,0.45)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
+      { type: 'line', label: 'Collected (BDT)', data: overallMonths.map(r => r.collected), borderColor: 'rgba(16,185,129,0.95)', backgroundColor: 'rgba(16,185,129,0.55)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
       { type: 'line', label: 'Files', data: overallMonths.map(r => r.files), borderColor: '#64748b', borderDash: [5, 4], borderWidth: 1.5, fill: false, tension: 0.35, pointRadius: 2.5, pointBackgroundColor: '#ffffff', pointBorderColor: '#64748b', pointBorderWidth: 1.5, yAxisID: 'files' },
     ],
   };
