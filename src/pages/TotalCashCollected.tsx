@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { dataService } from '../services/dataService';
 import { exportTableToExcel, exportTableToPdf } from '../services/exportService';
 import { AccessibleModal } from '../components/AccessibleModal';
+import { Button } from '../components/ui/Button';
+import { useToast } from '../components/ui/Toast';
 import { Collection, CaseFile } from '../types';
 import { 
   DollarSign, 
@@ -23,6 +25,7 @@ interface TotalCashCollectedProps {
 
 export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelectCase }) => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
@@ -32,6 +35,8 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
   const [rejectionReason, setRejectionReason] = useState('Amount does not match receipt');
 
   const [refreshKey, setRefreshKey] = useState(0);
+  const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null);
+  const [flashedRowId, setFlashedRowId] = useState<number | null>(null);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -152,9 +157,22 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
     });
   }, [collections, filterStatus, searchTerm, caseMap]);
 
+  /** Optimistic approve with a 5s undo window — the toast keeps working
+   *  because verifyCollection is idempotent per status transition. */
   const handleApprove = (id: number) => {
     dataService.verifyCollection(id, 'approved', undefined, user?.name || 'Admin');
+    setFlashedRowId(id);
+    setTimeout(() => setFlashedRowId(prev => (prev === id ? null : prev)), 1200);
     setAnnouncement('Payment approved.');
+    showToast(`Payment approved · BDT ${Number(collections.find(c => c.id === id)?.amount || 0).toLocaleString()}`, {
+      kind: 'success',
+      durationMs: 5000,
+      onUndo: () => {
+        dataService.resetCollectionVerification(id);
+        showToast('Approval undone — payment is pending again.', { kind: 'info' });
+        setRefreshKey(k => k + 1);
+      },
+    });
     setRefreshKey(k => k + 1);
   };
 
@@ -244,23 +262,39 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
   ];
 
   const handleExportExcel = () => {
-    exportTableToExcel(
-      `Total_Cash_Collected_${new Date().toISOString().slice(0, 10)}.xlsx`,
-      'Cash Collections',
-      EXPORT_HEADERS,
-      buildExportRows()
-    );
-    setAnnouncement(`Excel export started: ${filtered.length} records.`);
+    setExporting('excel');
+    try {
+      exportTableToExcel(
+        `Total_Cash_Collected_${new Date().toISOString().slice(0, 10)}.xlsx`,
+        'Cash Collections',
+        EXPORT_HEADERS,
+        buildExportRows()
+      );
+      showToast(`Excel exported — ${filtered.length} records.`, { kind: 'success' });
+      setAnnouncement(`Excel export started: ${filtered.length} records.`);
+    } catch (e: any) {
+      showToast(`Excel export failed: ${e?.message || 'unknown error'}`, { kind: 'error', sticky: true });
+    } finally {
+      setExporting(null);
+    }
   };
 
   const handleExportPdf = () => {
-    exportTableToPdf(
-      `Total_Cash_Collected_${new Date().toISOString().slice(0, 10)}.pdf`,
-      'Total Cash Collected & Verifications Report',
-      EXPORT_HEADERS,
-      buildExportRows()
-    );
-    setAnnouncement(`PDF export started: ${filtered.length} records.`);
+    setExporting('pdf');
+    try {
+      exportTableToPdf(
+        `Total_Cash_Collected_${new Date().toISOString().slice(0, 10)}.pdf`,
+        'Total Cash Collected & Verifications Report',
+        EXPORT_HEADERS,
+        buildExportRows()
+      );
+      showToast(`PDF exported — ${filtered.length} records.`, { kind: 'success' });
+      setAnnouncement(`PDF export started: ${filtered.length} records.`);
+    } catch (e: any) {
+      showToast(`PDF export failed: ${e?.message || 'unknown error'}`, { kind: 'error', sticky: true });
+    } finally {
+      setExporting(null);
+    }
   };
 
   return (
@@ -278,22 +312,24 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <button
+          <Button
+            variant="secondary"
             onClick={handleExportPdf}
-            className="px-3.5 py-2 min-h-[36px] rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 text-slate-600 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+            loading={exporting === 'pdf'}
             aria-label={`Export ${filtered.length} currently filtered records as a PDF report`}
           >
             <FileDown className="w-4 h-4" aria-hidden="true" />
             <span>Export PDF</span>
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
             onClick={handleExportExcel}
-            className="px-3.5 py-2 min-h-[36px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-emerald-600/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2"
+            loading={exporting === 'excel'}
             aria-label={`Export ${filtered.length} currently filtered records as an Excel spreadsheet`}
           >
             <FileSpreadsheet className="w-4 h-4" aria-hidden="true" />
             <span>Export Excel</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -385,15 +421,16 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
           ))}
 
           {selectedIds.size > 0 && (
-            <button
+            <Button
               ref={bulkDeleteRef}
+              variant="danger"
               onClick={handleBulkDelete}
-              disabled={deleting}
-              className="px-3 py-2 min-h-[36px] rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm shadow-rose-600/30 ml-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2"
+              loading={deleting}
+              className="ml-1"
             >
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
               <span>{deleting ? 'Deleting…' : `Delete Selected (${selectedIds.size})`}</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -441,6 +478,8 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
 
                 return (
                   <tr key={c.id} className={`transition-colors ${
+                    flashedRowId === c.id ? 'animate-row-flash' : ''
+                  } ${
                     selectedIds.has(c.id)
                       ? 'bg-rose-50 dark:bg-rose-950/20'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
@@ -544,22 +583,26 @@ export const TotalCashCollected: React.FC<TotalCashCollectedProps> = ({ onSelect
                         {user?.role !== 'agent' && (
                           <>
                             {st !== 'approved' && (
-                              <button
+                              <Button
+                                variant="primary"
+                                size="sm"
                                 onClick={() => handleApprove(c.id)}
-                                className="px-2.5 py-2 min-h-[36px] rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 transition-all shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
+                                className="min-h-[36px] rounded-lg"
                                 aria-label={`Approve payment of BDT ${Number(c.amount).toLocaleString()} for ${cItem ? cItem.customer_name : 'this case'}`}
                               >
                                 <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Approve
-                              </button>
+                              </Button>
                             )}
                             {st !== 'rejected' && (
-                              <button
+                              <Button
+                                variant="danger-ghost"
+                                size="sm"
                                 onClick={() => handleOpenRejectModal(c)}
-                                className="px-2.5 py-2 min-h-[36px] rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold text-[11px] flex items-center gap-1 transition-all border border-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+                                className="min-h-[36px] rounded-lg"
                                 aria-label={`Reject payment for ${cItem ? cItem.customer_name : 'this case'} with a reason note`}
                               >
                                 <XCircle className="w-3 h-3" aria-hidden="true" /> Reject
-                              </button>
+                              </Button>
                             )}
                           </>
                         )}

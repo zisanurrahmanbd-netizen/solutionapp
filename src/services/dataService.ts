@@ -1796,6 +1796,45 @@ class DataService {
     return col;
   }
 
+  /** Undo an approval/rejection: back to pending, clears verifier fields,
+   *  and restores the case's collected totals. Used by the approve undo toast. */
+  public resetCollectionVerification(collectionId: number): Collection | null {
+    const col = this.collections.find(c => c.id === collectionId);
+    if (!col) return null;
+
+    const previousStatus = col.status;
+    col.status = 'pending';
+    col.rejection_reason = undefined;
+    col.verified_at = undefined;
+    col.verified_by = undefined;
+
+    // Restore case totals the same way verifyCollection adjusted them.
+    const cItem = this.cases.find(c => c.id === col.case_file_id);
+    if (cItem && previousStatus === 'approved') {
+      cItem.total_collected_amount = Math.max(0, (cItem.total_collected_amount || 0) - col.amount);
+      if (cItem.total_collected_amount < cItem.outstanding_amount && cItem.status === 'settled') {
+        cItem.status = 'in_progress';
+      }
+    }
+
+    this.saveState();
+    this.notifySubscribers();
+    offlineQueue.runBackground({
+      kind: 'update', table: 'collections',
+      row: { status: 'pending', rejection_reason: null, verified_at: null, verified_by: null },
+      matchCol: 'id', matchVal: col.id
+    });
+    if (cItem) {
+      offlineQueue.runBackground({
+        kind: 'update', table: 'cases',
+        row: { total_collected_amount: cItem.total_collected_amount, status: cItem.status },
+        matchCol: 'id', matchVal: cItem.id
+      });
+    }
+
+    return col;
+  }
+
   public deleteCollection(collectionId: number): boolean {
     const idx = this.collections.findIndex(c => c.id === collectionId);
     if (idx === -1) return false;

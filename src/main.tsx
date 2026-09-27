@@ -6,6 +6,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { BrandingProvider } from './context/BrandingContext';
 import { PermissionsProvider } from './context/PermissionsContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { ToastProvider } from './components/ui/Toast';
 import './index.css';
 
 interface Props {
@@ -60,7 +61,9 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <BrandingProvider>
             <AuthProvider>
               <PermissionsProvider>
-                <App />
+                <ToastProvider>
+                  <App />
+                </ToastProvider>
               </PermissionsProvider>
             </AuthProvider>
           </BrandingProvider>

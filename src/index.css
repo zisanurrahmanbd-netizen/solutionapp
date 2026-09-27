@@ -2,11 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted Inter Variable — keeps the offline PWA shell typographically intact */
+@import '@fontsource-variable/inter';
+
 @layer base {
   html, body, #root {
     @apply antialiased font-sans;
     overflow-x: hidden;
     max-width: 100vw;
+  }
+
+  /* Respect reduced-motion for all custom animations */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -70,4 +82,22 @@
 
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-toast-in {
+  animation: toastIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes rowFlash {
+  0% { background-color: rgb(16 185 129 / 0.18); }
+  100% { background-color: transparent; }
+}
+
+.animate-row-flash {
+  animation: rowFlash 1.2s ease-out;
 }
