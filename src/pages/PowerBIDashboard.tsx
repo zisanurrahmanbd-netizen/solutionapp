@@ -377,14 +377,14 @@ export const PowerBIDashboard: React.FC = () => {
     ],
   };
 
-  // Per-month overview: total files (count) + overdue/outstanding/collected (BDT).
-  // Bars (money, left axis) are the focus; files is a thin dashed reference line (right axis).
+  // Per-month overview as layered area waves: overdue/outstanding/collected
+  // (BDT, left axis) + files dashed reference line (right axis).
   const monthlyOverviewChart = {
     labels: overallMonths.map(r => monthLabel(r.month)),
     datasets: [
-      { label: 'Overdue (BDT)', data: overallMonths.map(r => r.overdue), backgroundColor: 'rgba(244,63,94,0.8)', borderRadius: 4, maxBarThickness: 26 },
-      { label: 'Outstanding (BDT)', data: overallMonths.map(r => r.outstanding), backgroundColor: 'rgba(249,115,22,0.75)', borderRadius: 4, maxBarThickness: 26 },
-      { label: 'Collected (BDT)', data: overallMonths.map(r => r.collected), backgroundColor: 'rgba(16,185,129,0.8)', borderRadius: 4, maxBarThickness: 26 },
+      { label: 'Outstanding (BDT)', data: overallMonths.map(r => r.outstanding), borderColor: 'rgba(249,115,22,0.95)', backgroundColor: 'rgba(249,115,22,0.45)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
+      { label: 'Overdue (BDT)', data: overallMonths.map(r => r.overdue), borderColor: 'rgba(244,63,94,0.95)', backgroundColor: 'rgba(244,63,94,0.45)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
+      { label: 'Collected (BDT)', data: overallMonths.map(r => r.collected), borderColor: 'rgba(16,185,129,0.95)', backgroundColor: 'rgba(16,185,129,0.5)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 },
       { type: 'line', label: 'Files', data: overallMonths.map(r => r.files), borderColor: '#64748b', borderDash: [5, 4], borderWidth: 1.5, fill: false, tension: 0.35, pointRadius: 2.5, pointBackgroundColor: '#ffffff', pointBorderColor: '#64748b', pointBorderWidth: 1.5, yAxisID: 'files' },
     ],
   };
@@ -573,7 +573,7 @@ export const PowerBIDashboard: React.FC = () => {
           <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-indigo-500" /> Monthly Overview — Files, Overdue, Outstanding &amp; Collected
           </h3>
-          <span className="text-[10px] text-slate-400 font-bold uppercase">bars = BDT (left) · line = files (right)</span>
+          <span className="text-[10px] text-slate-400 font-bold uppercase">areas = BDT (left) · dashed line = files (right)</span>
         </div>
         <div className="h-64">
           <Bar data={monthlyOverviewChart as any} options={monthlyOverviewOptions} />
