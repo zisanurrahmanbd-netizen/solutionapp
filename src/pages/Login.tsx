@@ -93,10 +93,13 @@ export const Login: React.FC = () => {
       const result = await sendOtpToEmail(targetEmail, code, branding.headerText || 'Bank Recovery System');
       if (!result.success) {
         // All mail channels failed — tell the user instead of leaving them waiting on an email that never comes.
+        const rateLimited = (result.supabaseError || '').toLowerCase().includes('rate limit');
         setError(
-          `Could not send the verification email to ${targetEmail}. ` +
-          (result.supabaseError ? `Mail service said: ${result.supabaseError}. ` : '') +
-          'Check your internet connection, then tap Resend Code.'
+          rateLimited
+            ? `Too many verification email requests (${result.supabaseError}). Supabase's free plan only sends ~2 auth emails per hour — wait up to an hour, then tap Resend Code. The admin can lift this cap by enabling custom SMTP in Supabase (Project Settings → Authentication → SMTP).`
+            : `Could not send the verification email to ${targetEmail}. ` +
+              (result.supabaseError ? `Mail service said: ${result.supabaseError}. ` : '') +
+              'Check your internet connection, then tap Resend Code.'
         );
       }
     } catch (err) {
@@ -266,7 +269,8 @@ export const Login: React.FC = () => {
           {/* ── STEP 2: OTP Verification ─────────────────────────────────── */}
           {step === 'otp' && (
             <form onSubmit={handleOtpSubmit} className="space-y-5">
-              {/* Sent to indicator */}
+              {/* Sent to indicator — hidden while an error is showing so the screen never says "Code Dispatched" and "Could not send" at the same time */}
+              {!error && (
               <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40">
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <Mail className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -286,6 +290,7 @@ export const Login: React.FC = () => {
                   </p>
                 </div>
               </div>
+              )}
 
               {/* OTP Input */}
               <div>
