@@ -87,11 +87,21 @@ export const Login: React.FC = () => {
   // ─── Dispatch OTP via Email ──────────────────────────────────────────────
   const handleDispatchOtp = async (targetEmail: string) => {
     setOtpSending(true);
+    setError('');
     const code = generateOtp(targetEmail);
     try {
-      await sendOtpToEmail(targetEmail, code, branding.headerText || 'Bank Recovery System');
+      const result = await sendOtpToEmail(targetEmail, code, branding.headerText || 'Bank Recovery System');
+      if (!result.success) {
+        // All mail channels failed — tell the user instead of leaving them waiting on an email that never comes.
+        setError(
+          `Could not send the verification email to ${targetEmail}. ` +
+          (result.supabaseError ? `Mail service said: ${result.supabaseError}. ` : '') +
+          'Check your internet connection, then tap Resend Code.'
+        );
+      }
     } catch (err) {
       console.warn('Dispatch note:', err);
+      setError('Could not send the verification email. Check your internet connection, then tap Resend Code.');
     } finally {
       setOtpSending(false);
     }
@@ -272,7 +282,7 @@ export const Login: React.FC = () => {
                     Sent to <span className="font-semibold text-emerald-700 dark:text-emerald-300 font-mono">{otpEmail}</span>
                   </p>
                   <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                    Check your <strong className="text-slate-600 dark:text-slate-300">Inbox</strong> or <strong className="text-slate-600 dark:text-slate-300">Spam / Junk folder</strong>.
+                    Check your <strong className="text-slate-600 dark:text-slate-300">Inbox</strong> or <strong className="text-slate-600 dark:text-slate-300">Spam / Junk folder</strong>. Your code arrives in the email with a <strong className="text-slate-600 dark:text-slate-300">🔐 code in the subject</strong> — ignore any "Confirm your email address" email; that one has no code.
                   </p>
                 </div>
               </div>

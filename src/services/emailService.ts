@@ -1,7 +1,8 @@
-﻿import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
-export async function sendOtpToEmail(targetEmail: string, otpCode: string, systemName = 'Bank & MNC Recovery System'): Promise<{ success: boolean; channel?: string }> {
+export async function sendOtpToEmail(targetEmail: string, otpCode: string, systemName = 'Bank & MNC Recovery System'): Promise<{ success: boolean; channel?: string; supabaseError?: string }> {
   let sent = false;
+  let supabaseError: string | undefined;
   const cleanEmail = targetEmail.trim().toLowerCase();
 
   // ── Channel 1: Supabase Native Auth OTP (Instant Official Email) ─────────────
@@ -11,6 +12,9 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
       email: cleanEmail,
       options: {
         shouldCreateUser: true,
+        // The magic/OTP link must land on the live app, never on localhost:3000
+        // (Supabase's default Site URL is localhost until configured in the dashboard).
+        emailRedirectTo: `${window.location.protocol}//${window.location.host}/`,
       }
     });
     if (!error) {
@@ -18,9 +22,11 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
       sent = true;
     } else {
       console.warn('Supabase Auth OTP dispatch notice:', error.message);
+      supabaseError = error.message;
     }
-  } catch (err) {
+  } catch (err: any) {
     console.warn('Supabase Auth OTP dispatch catch:', err);
+    supabaseError = err?.message || String(err);
   }
 
   // ── Channel 2: Web3Forms Instant Direct Dispatch (Zero activation needed) ─────
@@ -74,5 +80,5 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
     console.warn('FormSubmit note:', err);
   }
 
-  return { success: sent, channel: sent ? 'email' : 'pending' };
+  return { success: sent, channel: sent ? 'email' : 'pending', supabaseError };
 }
