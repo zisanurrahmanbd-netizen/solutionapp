@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, UserRole } from '../types';
 import { supabase } from '../lib/supabase';
-import { recordLoginSession, pingSession, terminateCurrentSession } from '../services/sessionService';
+import { recordLoginSession, pingSession, terminateCurrentSession, isCurrentSessionRevoked } from '../services/sessionService';
 import { offlineQueue } from '../services/offlineQueue';
 
 // Real production admin only
@@ -273,13 +273,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user?.id]);
 
   // ── Live Session Watchdog: Force-logout deactivated users within 30s ──────
+  // Also enforces REMOTE DEVICE SIGN-OUT: if an admin revokes this device's
+  // session from Device Logins, the revoked_at flag is detected here and the
+  // device logs itself out within one tick.
   useEffect(() => {
     if (!user) return;
-    // Primary admin can never be deactivated — skip watchdog
-    if (user.email.toLowerCase() === REAL_ADMIN.email.toLowerCase()) return;
 
     const watchdog = setInterval(async () => {
       try {
+        // 1. Remote device revocation check (works for every role incl. admin)
+        const revoked = await isCurrentSessionRevoked();
+        if (revoked) {
+          localStorage.removeItem('recovery_auth_user');
+          localStorage.removeItem('recovery_device_session_id');
+          setUser(null);
+          window.dispatchEvent(new CustomEvent('account_deactivated', {
+            detail: { message: 'This device was signed out remotely by an administrator.' }
+          }));
+          return;
+        }
+
+        // 2. Deactivated-account check (primary admin can never be deactivated)
+        if (user.email.toLowerCase() === REAL_ADMIN.email.toLowerCase()) return;
         const { data, error } = await supabase
           .from('users')
           .select('id, status')
@@ -289,7 +304,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (error) return; // network issue — keep session alive, retry next tick
 
         if (data?.status === 'inactive') {
-          clearInterval(watchdog);
           localStorage.removeItem('recovery_auth_user');
           localStorage.removeItem('recovery_verified_devices');
           setUser(null);

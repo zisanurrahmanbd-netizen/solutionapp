@@ -1,4 +1,4 @@
-﻿import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { User } from '../types';
 
 export interface LoginSession {
@@ -264,21 +264,47 @@ export async function terminateCurrentSession(): Promise<void> {
 }
 
 // ── 6. Revoke / Remove Device Session ─────────────────────────────────────────
+// Marks the session revoked (instead of silently deleting it) so the TARGET
+// device's watchdog can detect the revocation and force itself to log out.
+// Pure deletion never reaches the device — it kept running happily.
 export async function revokeSession(sessionId: string): Promise<void> {
   try {
     const { data } = await supabase.from('file_templates').select('definition').eq('template_key', 'active_user_sessions').maybeSingle();
     if (data?.definition) {
       let sessions: LoginSession[] = typeof data.definition === 'string' ? JSON.parse(data.definition) : data.definition;
       if (Array.isArray(sessions)) {
-        sessions = sessions.filter(s => s.id !== sessionId);
+        const now = new Date().toISOString();
+        sessions = sessions
+          .map(s => s.id === sessionId ? { ...s, is_online: false, revoked_at: now, last_active_at: now } : (s as any))
+          .filter((s: any) => !s.revoked_at || Date.now() - new Date(s.revoked_at).getTime() < 24 * 60 * 60 * 1000);
         await supabase.from('file_templates').upsert({
           template_key: 'active_user_sessions',
           definition: JSON.stringify(sessions),
-          updated_at: new Date().toISOString(),
+          updated_at: now,
         }, { onConflict: 'template_key' });
       }
     }
   } catch (_) {}
+}
+
+/** True when THIS device's session has been remotely revoked by an admin. */
+export async function isCurrentSessionRevoked(): Promise<boolean> {
+  const session_id = localStorage.getItem('recovery_device_session_id');
+  if (!session_id) return false;
+  try {
+    const { data } = await supabase.from('file_templates').select('definition').eq('template_key', 'active_user_sessions').maybeSingle();
+    if (!data?.definition) return false;
+    const sessions: any[] = typeof data.definition === 'string' ? JSON.parse(data.definition) : data.definition;
+    if (!Array.isArray(sessions)) return false;
+    const mine = sessions.find(s => s.id === session_id);
+    // NOTE: a MISSING entry must NOT count as revoked — old/pruned sessions
+    // vanish without a revoked_at flag and force-logging those out would kick
+    // legitimate users. Only an explicit revoked_at flag signs a device out.
+    if (!mine) return false;
+    return Boolean(mine.revoked_at);
+  } catch (_) {
+    return false;
+  }
 }
 
 // ── 7. Get All Logged-in Device Sessions ──────────────────────────────────────
@@ -286,13 +312,17 @@ export async function getAllLoginSessions(): Promise<LoginSession[]> {
   try {
     const { data } = await supabase.from('file_templates').select('definition').eq('template_key', 'active_user_sessions').maybeSingle();
     if (data?.definition) {
-      const sessions: LoginSession[] = typeof data.definition === 'string' ? JSON.parse(data.definition) : data.definition;
+      const sessions: any[] = typeof data.definition === 'string' ? JSON.parse(data.definition) : data.definition;
       if (Array.isArray(sessions)) {
-        return sessions.map(s => {
-          const lastActive = new Date(s.last_active_at).getTime();
-          const isReallyOnline = (Date.now() - lastActive) < 5 * 60 * 1000;
-          return { ...s, is_online: s.is_online && isReallyOnline };
-        });
+        // Hide remotely-revoked sessions from the admin list (the entry stays in
+        // the cloud JSON for 24h so the target device can still detect the flag).
+        return sessions
+          .filter(s => !s.revoked_at)
+          .map(s => {
+            const lastActive = new Date(s.last_active_at).getTime();
+            const isReallyOnline = (Date.now() - lastActive) < 5 * 60 * 1000;
+            return { ...s, is_online: s.is_online && isReallyOnline };
+          });
       }
     }
   } catch (_) {}

@@ -1954,14 +1954,25 @@ class DataService {
     const totalOutstanding = cases.reduce((acc, c) => acc + (c.outstanding_amount || 0), 0);
     
     // For agent role: compute collected cash specifically from this agent's collections and their assigned files
+    // IMPORTANT: sum from the collections ledger (verified/approved + pending), NOT only the
+    // case's total_collected_amount column — legacy rows and cases imported by replaceAll
+    // carry total_collected_amount = 0, which made the dashboard show BDT 0 while the
+    // Power BI dashboard (which sums the ledger) showed the real figure.
     let totalCollected = 0;
+    const approvedOf = (col: any): boolean => {
+      const st = String(col.status || '').toLowerCase();
+      return st !== 'rejected';
+    };
     if (user.role === 'agent') {
-      const agentCols = this.collections.filter(col => col.agent_id === user.id);
-      const agentColsTotal = agentCols.reduce((sum, col) => sum + (Number(col.amount) || 0), 0);
+      const agentColsTotal = this.collections
+        .filter(col => col.agent_id === user.id && approvedOf(col))
+        .reduce((sum, col) => sum + (Number(col.amount) || 0), 0);
       const casesCollectedTotal = cases.reduce((acc, c) => acc + (c.total_collected_amount || 0), 0);
       totalCollected = Math.max(agentColsTotal, casesCollectedTotal);
     } else {
-      totalCollected = cases.reduce((acc, c) => acc + (c.total_collected_amount || 0), 0);
+      const ledgerTotal = this.collections.reduce((sum, col) => approvedOf(col) ? sum + (Number(col.amount) || 0) : sum, 0);
+      const casesCollectedTotal = cases.reduce((acc, c) => acc + (c.total_collected_amount || 0), 0);
+      totalCollected = Math.max(ledgerTotal, casesCollectedTotal);
     }
 
     const todayPtps = this.getTodayPtpAlerts(user);
