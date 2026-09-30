@@ -1,3 +1,5 @@
+import { supabase } from '../lib/supabase';
+
 export interface OtpSendResult {
   success: boolean;
   channel?: string;
@@ -12,15 +14,15 @@ export interface OtpSendResult {
 const WEB3FORMS_KEY = '5dc7bd71-6ce3-43fa-9b7a-421b72f0061a';
 
 /**
- * OTP mail delivery (v30):
- *  1. Web3Forms with the owner's fresh key → PRIMARY. No activation emails,
- *     no Cloudflare bot-wall for browsers. Codes arrive in the key owner's inbox.
- *  2. FormSubmit AJAX → fallback. Per-recipient (each user gets their own code
- *     email), but Cloudflare may block some mobile networks and the FIRST email
- *     to any address is held until that address clicks its one-time "Activate
- *     FormSubmit" email. Auto-retries transient "Failed to fetch" once.
- *
- * Channels run SEQUENTIALLY — a successful send never duplicates emails.
+ * OTP mail delivery (v31):
+ *  1. Supabase Auth OTP → PRIMARY once the admin plugs Mailjet into Supabase as
+ *     custom SMTP (guide in repo: MAILJET_SETUP.md). Supabase then emails the
+ *     6-digit code through Mailjet — real SMTP, no bot-walls, 200/day free,
+ *     and the app verifies those codes natively in AuthContext.verifyOtp.
+ *     Before Mailjet is configured, this channel fails fast with a clear note.
+ *  2. Web3Forms with the owner's fresh key → interim channel. Delivers to the
+ *     key-owner's inbox (not per-recipient).
+ *  3. FormSubmit AJAX → per-recipient fallback (one-time activation per address).
  */
 export async function sendOtpToEmail(targetEmail: string, otpCode: string, systemName = 'Bank & MNC Recovery System'): Promise<OtpSendResult> {
   const cleanEmail = targetEmail.trim().toLowerCase();
@@ -31,7 +33,30 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
   const subject = `🔐 Your Security Verification Code: ${otpCode} - ${systemName}`;
   const body = `Hello,\n\nYour 6-digit verification code to sign into ${systemName} is:\n\n👉  ${otpCode}  👈\n\nThis code is valid for 10 minutes.\nIf you did not request this code, please ignore this email.`;
 
-  // ── Channel 1 (PRIMARY): Web3Forms with the owner's fresh key ──────────────
+  // ── Channel 1 (PRIMARY once Mailjet SMTP is configured): Supabase Auth OTP ──
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: cleanEmail,
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${window.location.protocol}//${window.location.host}/`,
+      },
+    });
+    if (!error) {
+      console.log('OTP dispatched via Supabase Auth (Mailjet SMTP) to:', cleanEmail);
+      return { success: true, channel: 'supabase-mailjet', details: ['Supabase+Mailjet ✓'] };
+    }
+    const msg = error.message || '';
+    if (msg.toLowerCase().includes('rate limit')) {
+      details.push('Supabase: rate limit (Mailjet SMTP not configured yet — see MAILJET_SETUP.md)');
+    } else {
+      details.push(`Supabase: ${msg}`);
+    }
+  } catch (err: any) {
+    details.push(`Supabase: ${err?.message || 'unreachable'}`);
+  }
+
+  // ── Channel 2 (interim): Web3Forms with the owner's fresh key ──────────────
   try {
     const res = await fetch('https://api.web3forms.com/submit', {
       method: 'POST',
@@ -61,7 +86,7 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
     details.push(`Web3Forms: ${err?.message || String(err)}`);
   }
 
-  // ── Channel 2 (fallback, per-recipient): FormSubmit AJAX ───────────────────
+  // ── Channel 3 (fallback, per-recipient): FormSubmit AJAX ───────────────────
   const attemptFormSubmit = async (): Promise<{ ok: boolean; kind: 'success' | 'activation' | 'rate' | 'http' | 'network'; note?: string }> => {
     try {
       const res = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(cleanEmail)}`, {
