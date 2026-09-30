@@ -92,11 +92,15 @@ export const Login: React.FC = () => {
     try {
       const result = await sendOtpToEmail(targetEmail, code, branding.headerText || 'Bank Recovery System');
       if (!result.success) {
-        // All mail channels failed — tell the user exactly why instead of leaving them waiting.
+        // Tell the user exactly why instead of leaving them waiting on an email that never comes.
         if (result.formFirstActivation) {
           setError(
-            `First-time delivery setup for ${targetEmail}: the email relay sent a one-time activation email. ` +
-            'Open that activation email and tap Activate, then tap Resend Code — codes land instantly after that.'
+            `First-time setup for ${targetEmail}: FormSubmit sent a one-time "Activate" email. ` +
+            'Open that email and tap Activate, then tap Resend Code — codes land instantly after that.'
+          );
+        } else if (result.rateLimited) {
+          setError(
+            'FormSubmit is rate-limiting this network right now. Wait about a minute, then tap Resend Code.'
           );
         } else {
           setError(
