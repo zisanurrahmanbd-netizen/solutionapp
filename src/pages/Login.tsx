@@ -92,15 +92,24 @@ export const Login: React.FC = () => {
     try {
       const result = await sendOtpToEmail(targetEmail, code, branding.headerText || 'Bank Recovery System');
       if (!result.success) {
-        // All mail channels failed — tell the user instead of leaving them waiting on an email that never comes.
+        // All mail channels failed — tell the user exactly why instead of leaving them waiting.
         const rateLimited = (result.supabaseError || '').toLowerCase().includes('rate limit');
-        setError(
-          rateLimited
-            ? `Too many verification email requests (${result.supabaseError}). Supabase's free plan only sends ~2 auth emails per hour — wait up to an hour, then tap Resend Code. The admin can lift this cap by enabling custom SMTP in Supabase (Project Settings → Authentication → SMTP).`
-            : `Could not send the verification email to ${targetEmail}. ` +
-              (result.supabaseError ? `Mail service said: ${result.supabaseError}. ` : '') +
-              'Check your internet connection, then tap Resend Code.'
-        );
+        if (result.formFirstActivation) {
+          setError(
+            `First-time delivery setup for ${targetEmail}: the email relay sent a one-time activation email. ` +
+            'Open that activation email and tap Activate, then tap Resend Code — codes land instantly after that.'
+          );
+        } else if (rateLimited) {
+          setError(
+            `Too many verification email requests (${result.supabaseError}). Supabase's free plan only sends ~2 auth emails per hour — wait up to an hour, then tap Resend Code. The admin can lift this cap by enabling custom SMTP in Supabase (Project Settings → Authentication → SMTP).`
+          );
+        } else {
+          setError(
+            `Could not send the verification email to ${targetEmail}. ` +
+            (result.details?.length ? `(${result.details.join(' · ')}) ` : '') +
+            'Check your internet connection, then tap Resend Code.'
+          );
+        }
       }
     } catch (err) {
       console.warn('Dispatch note:', err);
