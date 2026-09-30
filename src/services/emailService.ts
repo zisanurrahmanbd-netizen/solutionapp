@@ -83,6 +83,8 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
   } else if (formRes.kind === 'rate') {
     rateLimited = true;
     details.push(`FormSubmit: rate limit (${formRes.note})`);
+  } else if (formRes.kind === 'network') {
+    details.push('FormSubmit: blocked by its bot protection on this network (after auto-retry)');
   } else {
     details.push(`FormSubmit: ${formRes.note}`);
   }
@@ -109,7 +111,12 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
       console.log('OTP dispatched via Web3Forms (last resort) to:', cleanEmail);
       return { success: true, channel: 'web3forms', details: [...details, 'Web3Forms ✓'] };
     }
-    details.push(`Web3Forms: ${res.ok ? (data?.message || 'rejected') : `HTTP ${res.status}`}`);
+    if (res.status === 400) {
+      // 400 = the access key itself was rejected (dead/expired) — a fresh key fixes it.
+      details.push('Web3Forms: access key rejected/expired — admin must create a fresh free key at web3forms.com');
+    } else {
+      details.push(`Web3Forms: ${res.ok ? (data?.message || 'rejected') : `HTTP ${res.status}`}`);
+    }
   } catch (err: any) {
     details.push(`Web3Forms: ${err?.message || String(err)}`);
   }
