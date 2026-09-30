@@ -1,26 +1,25 @@
-import { supabase } from '../lib/supabase';
-
 export interface OtpSendResult {
   success: boolean;
   channel?: string;
-  supabaseError?: string;
   formFirstActivation?: boolean;
   details?: string[];
 }
 
 /**
- * OTP mail delivery — FormSubmit FIRST (the user's chosen provider).
+ * OTP mail delivery — form-based only. Supabase Auth is NEVER called to send
+ * email: its built-in mailer is rate-limited (~2/hour on the free plan) and,
+ * with "Confirm email" enabled, sends a confirmation LINK instead of a code —
+ * which confused users. Removed entirely in v26.
  *
  * Order:
- *  1. FormSubmit AJAX  → the one and only primary channel. No hourly quota.
+ *  1. FormSubmit AJAX  → primary channel. No hourly quota.
  *     Note: the very first email FormSubmit ever sends to an address triggers a
  *     one-time "Activate" email; after that, every code lands instantly.
  *  2. Web3Forms        → only if FormSubmit fails outright (network/HTTP error).
- *  3. Supabase auth OTP→ last resort only, time-boxed to 6.5s. Rate-limited to
- *     ~2 emails/hour on the free plan, so it must never be depended on.
  *
  * Channels run SEQUENTIALLY (not parallel) so a successful FormSubmit send never
- * produces a duplicate second email.
+ * produces a duplicate second email. If both fail, the login screen shows the
+ * per-channel errors and a Resend Code button.
  */
 export async function sendOtpToEmail(targetEmail: string, otpCode: string, systemName = 'Bank & MNC Recovery System'): Promise<OtpSendResult> {
   const cleanEmail = targetEmail.trim().toLowerCase();
@@ -100,31 +99,6 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
     details.push(`Web3Forms: ${err?.message || String(err)}`);
   }
 
-  // ── Channel 3 (last resort): Supabase native auth OTP ───────────────────────
-  let supabaseError: string | undefined;
-  try {
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Supabase request timed out')), 6500)
-    );
-    const call = supabase.auth.signInWithOtp({
-      email: cleanEmail,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${window.location.protocol}//${window.location.host}/`,
-      }
-    });
-    const { error } = await Promise.race([call, timeout]);
-    if (!error) {
-      console.log('OTP dispatched via Supabase Auth Mailer (last resort) to:', cleanEmail);
-      return { success: true, channel: 'supabase', details: [...details, 'Supabase ✓'] };
-    }
-    supabaseError = error.message;
-    details.push(`Supabase: ${error.message}`);
-  } catch (err: any) {
-    supabaseError = err?.message || String(err);
-    details.push(`Supabase: ${supabaseError}`);
-  }
-
   console.warn('All OTP email channels failed:', details.join(' | '));
-  return { success: false, supabaseError, formFirstActivation, details };
+  return { success: false, formFirstActivation, details };
 }

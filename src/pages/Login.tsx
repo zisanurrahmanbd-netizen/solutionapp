@@ -93,15 +93,10 @@ export const Login: React.FC = () => {
       const result = await sendOtpToEmail(targetEmail, code, branding.headerText || 'Bank Recovery System');
       if (!result.success) {
         // All mail channels failed — tell the user exactly why instead of leaving them waiting.
-        const rateLimited = (result.supabaseError || '').toLowerCase().includes('rate limit');
         if (result.formFirstActivation) {
           setError(
             `First-time delivery setup for ${targetEmail}: the email relay sent a one-time activation email. ` +
             'Open that activation email and tap Activate, then tap Resend Code — codes land instantly after that.'
-          );
-        } else if (rateLimited) {
-          setError(
-            `Too many verification email requests (${result.supabaseError}). Supabase's free plan only sends ~2 auth emails per hour — wait up to an hour, then tap Resend Code. The admin can lift this cap by enabling custom SMTP in Supabase (Project Settings → Authentication → SMTP).`
           );
         } else {
           setError(
