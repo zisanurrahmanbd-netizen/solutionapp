@@ -6,20 +6,21 @@ export interface OtpSendResult {
   details?: string[];
 }
 
+// ── Web3Forms (PRIMARY) — owner's own fresh access key (Sep 2026) ──────────
+// NOTE: Web3Forms delivers every submission to the INBOX OF THE KEY OWNER —
+// it is not per-recipient. FormSubmit (fallback) is the per-recipient channel.
+const WEB3FORMS_KEY = '5dc7bd71-6ce3-43fa-9b7a-421b72f0061a';
+
 /**
- * OTP mail delivery — FormSubmit ONLY, as the product owner specified (v28).
- * Brevo was removed by request.
+ * OTP mail delivery (v30):
+ *  1. Web3Forms with the owner's fresh key → PRIMARY. No activation emails,
+ *     no Cloudflare bot-wall for browsers. Codes arrive in the key owner's inbox.
+ *  2. FormSubmit AJAX → fallback. Per-recipient (each user gets their own code
+ *     email), but Cloudflare may block some mobile networks and the FIRST email
+ *     to any address is held until that address clicks its one-time "Activate
+ *     FormSubmit" email. Auto-retries transient "Failed to fetch" once.
  *
- * Flow:
- *  1. FormSubmit AJAX POST → the user's own email receives the 6-digit code.
- *     • First time ever for an address: FormSubmit sends a one-time
- *       "Activate FormSubmit" email and HOLDS the submission until the user
- *       clicks Activate. This is FormSubmit's anti-spam and cannot be skipped.
- *       After activation, every code lands instantly.
- *     • Occasional "Failed to fetch" (Cloudflare blip on mobile networks) is
- *       auto-retried once after 1.5s before giving up.
- *     • HTTP 429 = FormSubmit per-IP rate limit; surfaced to the user.
- *  2. Web3Forms is a silent LAST RESORT only if FormSubmit errors outright.
+ * Channels run SEQUENTIALLY — a successful send never duplicates emails.
  */
 export async function sendOtpToEmail(targetEmail: string, otpCode: string, systemName = 'Bank & MNC Recovery System'): Promise<OtpSendResult> {
   const cleanEmail = targetEmail.trim().toLowerCase();
@@ -30,6 +31,37 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
   const subject = `🔐 Your Security Verification Code: ${otpCode} - ${systemName}`;
   const body = `Hello,\n\nYour 6-digit verification code to sign into ${systemName} is:\n\n👉  ${otpCode}  👈\n\nThis code is valid for 10 minutes.\nIf you did not request this code, please ignore this email.`;
 
+  // ── Channel 1 (PRIMARY): Web3Forms with the owner's fresh key ──────────────
+  try {
+    const res = await fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        access_key: WEB3FORMS_KEY,
+        subject,
+        from_name: systemName,
+        email: cleanEmail,
+        message: body,
+      })
+    });
+    const data = res.ok ? await res.json().catch(() => null as any) : null;
+    if (res.ok && data?.success === true) {
+      console.log('OTP dispatched via Web3Forms to:', cleanEmail);
+      return { success: true, channel: 'web3forms', details: ['Web3Forms ✓'] };
+    }
+    if (res.status === 400) {
+      details.push('Web3Forms: access key rejected — verify the key is active at web3forms.com');
+    } else {
+      details.push(`Web3Forms: ${res.ok ? (data?.message || 'rejected') : `HTTP ${res.status}`}`);
+    }
+  } catch (err: any) {
+    details.push(`Web3Forms: ${err?.message || String(err)}`);
+  }
+
+  // ── Channel 2 (fallback, per-recipient): FormSubmit AJAX ───────────────────
   const attemptFormSubmit = async (): Promise<{ ok: boolean; kind: 'success' | 'activation' | 'rate' | 'http' | 'network'; note?: string }> => {
     try {
       const res = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(cleanEmail)}`, {
@@ -75,7 +107,7 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
 
   if (formRes.ok) {
     console.log('OTP dispatched via FormSubmit to:', cleanEmail);
-    return { success: true, channel: 'formsubmit', details: ['FormSubmit ✓'] };
+    return { success: true, channel: 'formsubmit', details: [...details, 'FormSubmit ✓'] };
   }
   if (formRes.kind === 'activation') {
     formFirstActivation = true;
@@ -87,38 +119,6 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
     details.push('FormSubmit: blocked by its bot protection on this network (after auto-retry)');
   } else {
     details.push(`FormSubmit: ${formRes.note}`);
-  }
-
-  // ── Silent last resort: Web3Forms relay ─────────────────────────────────────
-  try {
-    const res = await fetch('https://api.web3forms.com/submit', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        access_key: '67c87c46-f94d-4952-bfb8-9366f075d71c',
-        subject,
-        from_name: systemName,
-        email: cleanEmail,
-        to_email: cleanEmail,
-        message: body,
-      })
-    });
-    const data = res.ok ? await res.json().catch(() => null as any) : null;
-    if (res.ok && data?.success === true) {
-      console.log('OTP dispatched via Web3Forms (last resort) to:', cleanEmail);
-      return { success: true, channel: 'web3forms', details: [...details, 'Web3Forms ✓'] };
-    }
-    if (res.status === 400) {
-      // 400 = the access key itself was rejected (dead/expired) — a fresh key fixes it.
-      details.push('Web3Forms: access key rejected/expired — admin must create a fresh free key at web3forms.com');
-    } else {
-      details.push(`Web3Forms: ${res.ok ? (data?.message || 'rejected') : `HTTP ${res.status}`}`);
-    }
-  } catch (err: any) {
-    details.push(`Web3Forms: ${err?.message || String(err)}`);
   }
 
   console.warn('OTP send failed:', details.join(' | '));
