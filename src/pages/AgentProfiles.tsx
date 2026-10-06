@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dataService, normalizeBankKey } from '../services/dataService';
+import { caseMatchesAgent, recordBelongsToAgentCases } from '../services/agentMatching';
 import { CaseFile, Collection, CheckIn, CaseRemark, User } from '../types';
 import {
   Users, Search, Target, TrendingUp, MapPin, ClipboardList,
@@ -21,30 +22,9 @@ const isApproved = (c: Collection) => {
   return st === 'approved' || st === 'verified';
 };
 
-/** Mirror of dataService.getCases agent matching: id match OR name/employee
- *  id/email string match against the case's agent_name column — many files
- *  are only linked by name (sheet upload), not by assigned_agent_id. */
-const matchesAgent = (c: CaseFile, agent: User): boolean => {
-  if (c.assigned_agent_id === agent.id) return true;
-  const uName = (agent.name || '').trim().toLowerCase();
-  const uEmp = (agent.employee_id || '').trim().toLowerCase();
-  const uEmail = (agent.email || '').trim().toLowerCase();
-  const rawAgent = (
-    c.agent_name ||
-    c.extra_attributes?.AGENT_NAME ||
-    c.extra_attributes?.AGENT ||
-    c.extra_attributes?.FIELD_AGENT ||
-    ''
-  ).trim().toLowerCase();
-  if (!rawAgent) return false;
-  return (
-    rawAgent === uName ||
-    (!!uEmp && rawAgent === uEmp) ||
-    (!!uEmail && (rawAgent === uEmail || uEmail.startsWith(rawAgent))) ||
-    (!!uName && uName.includes(rawAgent)) ||
-    (!!uName && rawAgent.includes(uName))
-  );
-};
+// Per-agent matching uses the shared strict matcher (caseMatchesAgent):
+// exact agent_name / employee_id, no substring or email matching, and a
+// contradicting sheet agent_name overrides a wrong assigned_agent_id.
 
 const fmtMoney = (n: number) => {
   const abs = Math.abs(n);
@@ -126,15 +106,15 @@ const AgentProfilesPage: React.FC = () => {
     return users
       .filter(u => u.role === 'agent')
       .map(agent => {
-        const agentCases = allCases.filter(c => matchesAgent(c, agent));
+        const agentCases = allCases.filter(c => caseMatchesAgent(c, agent));
         const agentCaseIds = new Set(agentCases.map(c => c.id));
         // Collections/check-ins link to the agent by id OR by belonging to
         // one of the agent's cases (covers legacy rows with agent_id 0).
         const agentCollections = allCollections.filter(
-          c => c.agent_id === agent.id || agentCaseIds.has(c.case_file_id)
+          c => recordBelongsToAgentCases(c, agentCaseIds, agent.id)
         );
         const agentCheckIns = allCheckIns.filter(
-          ci => ci.agent_id === agent.id || agentCaseIds.has(ci.case_file_id)
+          ci => recordBelongsToAgentCases(ci, agentCaseIds, agent.id)
         );
         const agentRemarks = allRemarks.filter(r => agentCaseIds.has(r.case_file_id));
 

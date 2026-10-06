@@ -5,13 +5,14 @@ import { CaseFile, User } from '../types';
  * assigned_agent_id (proper link) OR only the agent_name string written in
  * the sheet upload (AGENT_NAME column). Mirrors dataService.getCases()
  * matching so every analytics view agrees with the per-agent case list.
+ *
+ * Matching is STRICT: exact name or exact employee_id. No substring and no
+ * email matching — "zim" inside "zisanurrahmanzim@gmail.com" used to steal
+ * every Zim file for Zisanur Rahman's account on each daily upload.
  */
 export const caseMatchesAgent = (c: CaseFile, agent: User): boolean => {
-  if (c.assigned_agent_id === agent.id) return true;
-
   const uName = (agent.name || '').trim().toLowerCase();
   const uEmp = (agent.employee_id || '').trim().toLowerCase();
-  const uEmail = (agent.email || '').trim().toLowerCase();
   const rawAgent = (
     c.agent_name ||
     c.extra_attributes?.AGENT_NAME ||
@@ -20,15 +21,16 @@ export const caseMatchesAgent = (c: CaseFile, agent: User): boolean => {
     ''
   ).trim().toLowerCase();
 
+  // assigned_agent_id decides UNLESS it contradicts the sheet's agent_name
+  // (a wrong id from a past buggy upload must not override the sheet).
+  if (c.assigned_agent_id === agent.id) {
+    if (!rawAgent) return true;
+    if (rawAgent === uName || (!!uEmp && rawAgent === uEmp)) return true;
+    if (uName && rawAgent !== uName) return false; // conflict → trust the sheet
+  }
   if (!rawAgent) return false;
 
-  return (
-    rawAgent === uName ||
-    (!!uEmp && rawAgent === uEmp) ||
-    (!!uEmail && (rawAgent === uEmail || uEmail.startsWith(rawAgent))) ||
-    (!!uName && uName.includes(rawAgent)) ||
-    (!!uName && rawAgent.includes(uName))
-  );
+  return rawAgent === uName || (!!uEmp && rawAgent === uEmp);
 };
 
 /**

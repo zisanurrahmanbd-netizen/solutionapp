@@ -1341,13 +1341,8 @@ class DataService {
     } else if (user.role === 'agent') {
       const uName = (user.name || '').trim().toLowerCase();
       const uEmp = (user.employee_id || '').trim().toLowerCase();
-      const uEmail = (user.email || '').trim().toLowerCase();
 
       list = list.filter(c => {
-        // 1. Direct ID match
-        if (c.assigned_agent_id === user.id) return true;
-
-        // 2. Name or employee_id string match on agent_name or extra_attributes
         const rawAgent = (
           c.agent_name || 
           c.extra_attributes?.AGENT_NAME || 
@@ -1356,15 +1351,19 @@ class DataService {
           ''
         ).trim().toLowerCase();
 
-        if (rawAgent && (
-          rawAgent === uName || 
-          (uEmp && rawAgent === uEmp) || 
-          (uEmail && (rawAgent === uEmail || uEmail.startsWith(rawAgent))) ||
-          uName.includes(rawAgent) ||
-          rawAgent.includes(uName)
-        )) {
-          return true;
+        // 1. Direct ID match — but a sheet agent_name that contradicts the id
+        //    wins: a past buggy upload must not keep stolen files attributed
+        //    to the wrong agent ("zim" ⊂ "zisanurrahmanzim@gmail.com" bug).
+        if (c.assigned_agent_id === user.id) {
+          if (!rawAgent) return true;
+          if (rawAgent === uName || (!!uEmp && rawAgent === uEmp)) return true;
+          if (uName && rawAgent !== uName) return false;
         }
+
+        // 2. STRICT name/employee_id match only. No substring, no email:
+        //    loose matching re-assigned one agent's whole portfolio to another
+        //    on every daily sheet upload.
+        if (rawAgent && (rawAgent === uName || (!!uEmp && rawAgent === uEmp))) return true;
 
         return false;
       });
@@ -1467,14 +1466,17 @@ class DataService {
       let matchedAgentId: number | null = null;
       if (rawAgentName) {
         const lowerAgent = rawAgentName.toLowerCase();
+        // STRICT matching only: exact name or exact employee_id. Never match by
+        // substring or email — "Zim" inside "zisanurrahmanzim@gmail.com" used
+        // to hand every Zim file to Zisanur Rahman's account on each upload.
         const matchedUser = registeredUsers.find(u =>
           u.name.trim().toLowerCase() === lowerAgent ||
-          (u.employee_id && u.employee_id.trim().toLowerCase() === lowerAgent) ||
-          (u.email && u.email.trim().toLowerCase().includes(lowerAgent))
+          (!!u.employee_id && u.employee_id.trim().toLowerCase() === lowerAgent)
         );
-        if (matchedUser) matchedAgentId = matchedUser.id;
-        else if (existingCase?.assigned_agent_id && existingCase.agent_name?.trim().toLowerCase() === lowerAgent) {
-          matchedAgentId = existingCase.assigned_agent_id;
+        if (matchedUser) {
+          matchedAgentId = matchedUser.id;
+        } else {
+          matchedAgentId = null;
         }
       } else {
         matchedAgentId = null;
