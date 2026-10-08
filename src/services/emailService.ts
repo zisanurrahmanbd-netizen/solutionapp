@@ -13,21 +13,25 @@ export interface OtpSendResult {
 const WEB3FORMS_KEY = '5dc7bd71-6ce3-43fa-9b7a-421b72f0061a';
 
 /**
- * OTP mail delivery (v32) — owner's chosen setup:
- *  1. Web3Forms with the owner's fresh key → PRIMARY. No activation emails,
- *     no Cloudflare bot-wall for browsers. Codes arrive in the key owner's inbox.
- *  2. FormSubmit AJAX → fallback. Per-recipient (each user gets their own code
- *     email), but Cloudflare may block some mobile networks and the FIRST email
- *     to any address is held until that address clicks its one-time "Activate
- *     FormSubmit" email. Auto-retries transient "Failed to fetch" once.
- *
- * Channels run SEQUENTIALLY — a successful send never duplicates emails.
+ * OTP mail delivery (v36) — BOTH channels always run:
+ *  1. Web3Forms → administrator-inbox copy. Fast, no activation, no bot-wall,
+ *     but NOT per-recipient: the code lands in the key owner's inbox only.
+ *     Kept so the administrator can always read a code aloud if an agent's
+ *     own mail delivery fails.
+ *  2. FormSubmit AJAX → per-recipient copy TO THE AGENT'S OWN ADDRESS. This is
+ *     the delivery that matters — overall success is decided by this channel,
+ *     because the agent is who must receive the code. Cloudflare may block some
+ *     mobile networks and the FIRST email to any address is held until that
+ *     address clicks its one-time "Activate FormSubmit" email. Auto-retries
+ *     transient "Failed to fetch" once; every failure is surfaced to the login
+ *     UI with an actionable message instead of a silent wait.
  */
 export async function sendOtpToEmail(targetEmail: string, otpCode: string, systemName = 'Bank & MNC Recovery System'): Promise<OtpSendResult> {
   const cleanEmail = targetEmail.trim().toLowerCase();
   const details: string[] = [];
   let formFirstActivation = false;
   let rateLimited = false;
+  let web3ok = false;
 
   const subject = `🔐 Your Security Verification Code: ${otpCode} - ${systemName}`;
   const body = `Hello,\n\nYour 6-digit verification code to sign into ${systemName} is:\n\n👉  ${otpCode}  👈\n\nThis code is valid for 10 minutes.\nIf you did not request this code, please ignore this email.`;
@@ -50,10 +54,11 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
     });
     const data = res.ok ? await res.json().catch(() => null as any) : null;
     if (res.ok && data?.success === true) {
-      console.log('OTP dispatched via Web3Forms to:', cleanEmail);
-      return { success: true, channel: 'web3forms', details: ['Web3Forms ✓'] };
-    }
-    if (res.status === 400) {
+      // Delivered — but only to the key owner's inbox, so keep going: the agent
+      // still needs the per-recipient FormSubmit copy below.
+      web3ok = true;
+      details.push('Web3Forms ✓ (administrator inbox copy)');
+    } else if (res.status === 400) {
       details.push('Web3Forms: access key rejected — verify the key is active at web3forms.com');
     } else {
       details.push(`Web3Forms: ${res.ok ? (data?.message || 'rejected') : `HTTP ${res.status}`}`);
@@ -108,7 +113,7 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
 
   if (formRes.ok) {
     console.log('OTP dispatched via FormSubmit to:', cleanEmail);
-    return { success: true, channel: 'formsubmit', details: [...details, 'FormSubmit ✓'] };
+    return { success: true, channel: web3ok ? 'formsubmit+web3forms' : 'formsubmit', details: [...details, 'FormSubmit ✓ (delivered to recipient)'] };
   }
   if (formRes.kind === 'activation') {
     formFirstActivation = true;
@@ -122,6 +127,9 @@ export async function sendOtpToEmail(targetEmail: string, otpCode: string, syste
     details.push(`FormSubmit: ${formRes.note}`);
   }
 
+  if (web3ok) {
+    details.push('Web3Forms ✓ — a copy of this code is in the administrator inbox; ask your admin to read it out if your own mail keeps failing');
+  }
   console.warn('OTP send failed:', details.join(' | '));
   return { success: false, formFirstActivation, rateLimited, details };
 }

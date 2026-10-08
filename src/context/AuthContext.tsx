@@ -17,6 +17,37 @@ export const REAL_ADMIN: User = {
   password: '@01608800026',
 };
 
+// ── Password verification ──────────────────────────────────────────────────
+// Stored passwords come in two shapes: plain text (legacy rows and seed
+// defaults) or PBKDF2-SHA256 as `pbkdf2$<iterations>$<salt-b64>$<hash-b64>`
+// (bulk-hashed rows in the live Supabase `users` table). Verify whichever is
+// actually stored so hashed accounts can pass the password gate and reach the
+// OTP step instead of dying on a raw string comparison.
+async function verifyPasswordAgainst(plain: string, stored: string): Promise<boolean> {
+  if (!stored) return false;
+  if (!stored.startsWith('pbkdf2$')) return plain === stored;
+  try {
+    const parts = stored.split('$');
+    const iterStr = parts[1] || '';
+    const saltB64 = parts[2] || '';
+    const hashB64 = parts[3] || '';
+    const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0));
+    const expected = Uint8Array.from(atob(hashB64), c => c.charCodeAt(0));
+    if (!salt.length || !expected.length) return false;
+    const key = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(plain), 'PBKDF2', false, ['deriveBits'],
+    );
+    const bits = new Uint8Array(await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations: Number(iterStr), hash: 'SHA-256' },
+      key, expected.length * 8,
+    ));
+    if (bits.length !== expected.length) return false;
+    return bits.every((b, i) => b === expected[i]);
+  } catch {
+    return false;
+  }
+}
+
 const USERS_VERSION = '7.0_supabase_cloud_sync';
 
 // Levenshtein edit distance — used to catch login email typos (e.g. missing 'z').
@@ -531,7 +562,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!correctPassword) {
       return { result: 'error', error: 'Account password not configured. Contact Administrator.' };
     }
-    if (pass !== correctPassword) {
+    if (!(await verifyPasswordAgainst(pass, correctPassword))) {
       return { result: 'error', error: 'Incorrect password. Please try again.' };
     }
 
