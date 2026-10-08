@@ -735,7 +735,7 @@ export const CaseDetail: React.FC<{ caseId: number; onBack: () => void }> = ({ c
 
                       {/* Visited Address string */}
                       <div className="text-slate-800 dark:text-slate-200 font-medium flex items-start gap-1.5">
-                        <span className="text-slate-400 font-bold">{t('cases.status') === 'à¦…à¦¬à¦¸à§à¦¥à¦¾' ? 'à¦ à¦¿à¦•à¦¾à¦¨à¦¾:' : 'Address:'}</span>
+                        <span className="text-slate-400 font-bold">{t('cases.status') === 'অবস্থা' ? 'ঠিকানা:' : 'Address:'}</span>
                         <span>{addressVisited || 'Address record on file'}</span>
                       </div>
 
@@ -746,7 +746,7 @@ export const CaseDetail: React.FC<{ caseId: number; onBack: () => void }> = ({ c
                             Lat: {ci.latitude.toFixed(6)}, Lng: {ci.longitude.toFixed(6)}
                           </span>
                           <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                            ({t('map.accuracy', 'Accuracy')}: Â±{ci.accuracy || 8}m)
+                            ({t('map.accuracy', 'Accuracy')}: ±{ci.accuracy || 8}m)
                           </span>
                         </div>
 
@@ -878,13 +878,13 @@ export const CaseDetail: React.FC<{ caseId: number; onBack: () => void }> = ({ c
       {/* GPS CHECK-IN MODAL */}
       {showCheckIn && (
         <div className="fixed inset-0 z-[100] w-screen h-screen flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <form onSubmit={handleCheckInSubmit} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl max-w-md w-full space-y-4 text-xs shadow-2xl">
+          <form onSubmit={handleCheckInSubmit} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl max-w-md w-full space-y-4 text-xs shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                 <Navigation className="w-4 h-4 text-purple-500 animate-pulse" />
                 <span>{t('detail.gps_checkin', 'GPS Field Visit Check-In')}</span>
               </h3>
-              <button type="button" onClick={() => setShowCheckIn(false)} className="text-slate-400 hover:text-white">âœ•</button>
+              <button type="button" onClick={() => setShowCheckIn(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
             {/* GPS Signal Status Badge */}
@@ -896,7 +896,7 @@ export const CaseDetail: React.FC<{ caseId: number; onBack: () => void }> = ({ c
                 </span>
                 {gpsCoords && (
                   <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                    Â±{gpsCoords.accuracy || 6}m {t('map.accuracy', 'Precision')}
+                    ±{gpsCoords.accuracy || 6}m {t('map.accuracy', 'Precision')}
                   </span>
                 )}
               </div>
@@ -1028,7 +1028,7 @@ export const CaseDetail: React.FC<{ caseId: number; onBack: () => void }> = ({ c
       {/* Record Payment Modal */}
       {showCol && (
         <div className="fixed inset-0 z-[100] w-screen h-screen flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <form onSubmit={handleCollection} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl max-w-sm w-full space-y-3 text-xs shadow-2xl">
+          <form onSubmit={handleCollection} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl max-w-sm w-full space-y-3 text-xs shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-sm text-slate-900 dark:text-white">{t('detail.record_payment', 'Record Payment')}</h3>
             <div>
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">Collection Amount (BDT) *</label>
@@ -1231,7 +1231,7 @@ export const CaseDetail: React.FC<{ caseId: number; onBack: () => void }> = ({ c
       {/* Reassign Case Modal */}
       {showReassign && (
         <div className="fixed inset-0 z-[100] w-screen h-screen flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <form onSubmit={handleReassign} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl max-w-sm w-full space-y-3 text-xs shadow-2xl">
+          <form onSubmit={handleReassign} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl max-w-sm w-full space-y-3 text-xs shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-sm text-slate-900 dark:text-white">{t('detail.reassign', 'Reassign Case File')}</h3>
             <select value={selAgentId} onChange={e => setSelAgentId(Number(e.target.value))} className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-bold">
               {agents.map(a => <option key={a.id} value={a.id}>{a.name} ({a.employee_id})</option>)}

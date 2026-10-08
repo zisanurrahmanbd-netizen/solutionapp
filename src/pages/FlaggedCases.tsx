@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { dataService } from '../services/dataService';
@@ -35,7 +35,7 @@ export const FlaggedCasesPage: React.FC<FlaggedCasesProps> = ({ onSelectCase }) 
                 <th className="py-3 px-4">{t('cases.customer', 'File / Customer')}</th>
                 <th className="py-3 px-4">{t('cases.bank_product', 'Bank / Product')}</th>
                 <th className="py-3 px-4">{t('cases.status', 'Flag Category')}</th>
-                <th className="py-3 px-4">{t('top.switch_lang') === 'English' ? 'à¦†à¦‡à¦¨à¦¿ à¦®à¦¨à§à¦¤à¦¬à§à¦¯' : 'Legal Notes'}</th>
+                <th className="py-3 px-4">{t('top.switch_lang') === 'English' ? 'আইনি মন্তব্য' : 'Legal Notes'}</th>
                 <th className="py-3 px-4 text-right">{t('cases.outstanding', 'Outstanding')} (BDT)</th>
                 <th className="py-3 px-4 text-right">{t('cases.action', 'Action')}</th>
               </tr>
