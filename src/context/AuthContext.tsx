@@ -2,7 +2,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { User, UserRole } from '../types';
 import { supabase } from '../lib/supabase';
 import { recordLoginSession, pingSession, terminateCurrentSession, isCurrentSessionRevoked } from '../services/sessionService';
-import { offlineQueue } from '../services/offlineQueue';
+import { offlineQueue, LOCATION_PING_ENDPOINT } from '../services/offlineQueue';
+import type { LastFix } from '../services/offlineQueue';
+
+// Last confirmed GPS fix, kept in module scope so the unload handlers wired by
+// startBackgroundPinger() can flush it even after the React tree that owns
+// `updateUserLocation` has torn down.
+let lastFix: LastFix | null = null;
 
 // Real production admin only
 export const REAL_ADMIN: User = {
@@ -141,6 +147,8 @@ interface AuthContextType {
   updateUser: (id: number, user: Partial<User>) => Promise<void>;
   deleteUser: (id: number) => Promise<void>;
   updateUserLocation: (lat: number, lng: number) => void;
+  persistTrackingSession: (userId: number) => void;
+  clearTrackingSession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -371,6 +379,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserLocation = useCallback((lat: number, lng: number) => {
     if (!user) return;
+
+    // Keep a session-scoped copy of the current agent id so the beacon-based
+    // last-fix flush (offlineQueue.handleBeaconPing) can write a location_pings
+    // row even after the React tree owning `updateUserLocation` has torn down.
+    try { sessionStorage.setItem('tracking:userId', String(user.id)); } catch (_) {}
+
+    if (lastFix == null) {
+      lastFix = { lat, lng };
+    } else if (Math.abs(lastFix.lat - lat) > 0.00001 || Math.abs(lastFix.lng - lng) > 0.00001) {
+      lastFix = { lat, lng };
+    }
     const nowIso = new Date().toISOString();
     
     setUsers(prev => {
@@ -646,6 +665,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setOtpSession(null);
   };
 
+  const persistTrackingSession = (userId: number) => {
+    try { sessionStorage.setItem('tracking:userId', String(userId)); } catch (_) {}
+  };
+
+  const clearTrackingSession = () => {
+    try { sessionStorage.removeItem('tracking:userId'); } catch (_) {}
+  };
+
   const SUPABASE_URL = 'https://qjcuzydfxbdhepcumale.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_IBUA2iCD_p1b3rmTuC7zGg_Lk-ViIaA';
 
@@ -766,7 +793,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login, verifyOtp, pendingEmail, generateOtp,
       logout,
       addUser, updateUser, deleteUser,
-      updateUserLocation
+      updateUserLocation,
+      persistTrackingSession,
+      clearTrackingSession
     }}>
       {children}
     </AuthContext.Provider>

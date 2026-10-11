@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
+import { startBackgroundPinger } from './services/hrService';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -20,7 +21,6 @@ import { QuickActions } from './components/QuickActions';
 import { WorkHubPage } from './pages/WorkHub';
 import { PowerBIDashboard } from './pages/PowerBIDashboard';
 import { BulkMessagesPage } from './pages/BulkMessages';
-import { startBackgroundPinger } from './services/hrService';
 
 export const App: React.FC = () => {
   const { user, updateUserLocation } = useAuth();
@@ -38,9 +38,17 @@ export const App: React.FC = () => {
   // IMPORTANT: all hooks must run unconditionally on every render (before
   // any early return) — otherwise React throws error #310 when `user`
   // changes from null to a logged-in user (e.g. right after login).
+  //
+  // When the user exits the app (closes the tab / minimizes), the pinger keeps
+  // the last GPS fix in module scope and flushes it on pagehide / beforeunload
+  // via navigator.sendBeacon (falling back to the Supabase queue). On most
+  // modern browsers a SW stays alive for ~30s while the page shuts down, so a
+  // lightweight beacon is the safest way to push a final fix without relying on
+  // the page JS surviving shutdown.
   useEffect(() => {
     if (!user) return;
-    return startBackgroundPinger(user.id, updateUserLocation);
+    const cleanup = startBackgroundPinger(user.id, updateUserLocation);
+    return cleanup;
   }, [user?.id, updateUserLocation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user) {

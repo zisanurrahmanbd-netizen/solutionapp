@@ -10,6 +10,21 @@ import { supabase } from '../lib/supabase';
 // realtime as usual.
 // ═══════════════════════════════════════════════════════════════════════
 
+// Endpoint hit by navigator.sendBeacon when the tracker flushes its last fix
+// on page hide / app close. Lightweight: accepts only lat/lng and writes a
+// location_pings row for the authenticated agent that owns the session.
+export const LOCATION_PING_ENDPOINT = '/api/location_ping';
+
+// Last confirmed GPS fix, kept in module scope so the unload handlers wired by
+// startBackgroundPinger() can flush it even after the React tree that owns
+// `updateUserLocation` has torn down.
+export interface LastFix {
+  lat: number;
+  lng: number;
+  accuracy?: number | null;
+  speed?: number | null;
+}
+
 export type QueuedOp =
   | { kind: 'insert'; table: string; row: any }
   | { kind: 'update'; table: string; row: any; matchCol: string; matchVal: any }
@@ -136,6 +151,26 @@ class OfflineQueue {
     if (this.queue.length > MAX_OPS) this.queue.splice(0, this.queue.length - MAX_OPS);
     saveQueue(this.queue);
     this.notify();
+  }
+
+  async handleBeaconPing(payload: Record<string, string>): Promise<void> {
+    const lat = Number(payload.lat);
+    const lng = Number(payload.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const userId = typeof window !== 'undefined' ? parseInt(sessionStorage.getItem('tracking:userId') || '0', 10) : 0;
+    if (!userId) return;
+    try {
+      await supabase.from('location_pings').insert({
+        user_id: userId,
+        latitude: lat,
+        longitude: lng,
+        accuracy: null,
+        speed: null,
+        pinged_at: new Date().toISOString(),
+      });
+    } catch (_) {
+      // Table may not exist yet — non-fatal
+    }
   }
 
   private async execute(op: QueuedOp): Promise<string | null> {

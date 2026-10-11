@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { fetchAllRows } from './dataService';
-import { offlineQueue } from './offlineQueue';
+import { offlineQueue, LOCATION_PING_ENDPOINT } from './offlineQueue';
 
 // ═══════════════════════════════════════════════════════════════════════
 // HR & Operations modules — backed by a single flexible `hr_records` table
@@ -196,6 +196,16 @@ export const trackingService = {
 let pingerStarted = false;
 let lastPingAt = 0;
 
+// Last confirmed fix, kept in module scope so the unload handlers can flush
+// even after the React tree that owns `onLocation` has torn down.
+export interface LastFix {
+  lat: number;
+  lng: number;
+  accuracy?: number | null;
+  speed?: number | null;
+}
+let lastFix: LastFix | null = null;
+
 export function startBackgroundPinger(
   userId: number,
   onLocation: (lat: number, lng: number) => void
@@ -211,10 +221,14 @@ export function startBackgroundPinger(
     void trackingService.recordPing(userId, lat, lng, accuracy, speed);
   };
 
+  const setLastFixFromCoords = (lat: number, lng: number, accuracy?: number | null, speed?: number | null) => {
+    lastFix = { lat, lng, accuracy: accuracy ?? null, speed: speed ?? null };
+  };
+
   const pingOnce = (highAccuracy: boolean) => {
     if (!('geolocation' in navigator)) return;
     navigator.geolocation.getCurrentPosition(
-      pos => push(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed),
+      pos => { push(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed); setLastFixFromCoords(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed); } ,
       () => {},
       { enableHighAccuracy: highAccuracy, timeout: 15000, maximumAge: 60000 }
     );
@@ -227,11 +241,26 @@ export function startBackgroundPinger(
   let watchId: number | null = null;
   if ('geolocation' in navigator) {
     watchId = navigator.geolocation.watchPosition(
-      pos => push(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed),
+      pos => { push(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed); setLastFixFromCoords(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.speed); } ,
       () => {},
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 }
     );
   }
+
+  // ── Page hide / unload: push the last GPS fix now so the trail keeps
+  // tracking even if the user closes the tab. The service worker stays alive
+  // for ~30s on most browsers, so sendBeacon is the safest way to fire a
+  // final ping without relying on the page JS surviving shutdown.
+  const pushLastFix = () => {
+    if (lastFix == null) return;
+    if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator) {
+      const body = new URLSearchParams({ lat: String(lastFix.lat), lng: String(lastFix.lng) });
+      navigator.sendBeacon('/api/location_ping', body);
+    } else {
+      // Fallback to the Supabase queue when sendBeacon isn't available.
+      void trackingService.recordPing(userId, lastFix.lat, lastFix.lng, lastFix.accuracy, lastFix.speed);
+    }
+  };
 
   // Hidden tab / 24-7: interval fallback every 2 minutes
   const interval = setInterval(() => {
@@ -239,11 +268,24 @@ export function startBackgroundPinger(
     pingOnce(false);
   }, 120000);
 
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      pingOnce(false);
+    }
+  });
+
+  window.addEventListener('pagehide', pushLastFix);
+  window.addEventListener('beforeunload', pushLastFix);
+
   return () => {
     if (watchId !== null && 'geolocation' in navigator) {
       navigator.geolocation.clearWatch(watchId);
     }
     clearInterval(interval);
+    window.removeEventListener('visibilitychange', pushLastFix);
+    window.removeEventListener('pagehide', pushLastFix);
+    window.removeEventListener('beforeunload', pushLastFix);
     pingerStarted = false;
+    lastFix = null;
   };
 }
